@@ -388,6 +388,7 @@ abstract class Som_Model_Abstract
      * @param string $field
      * @param mixed callback, или string ('int', 'bool', ect) или массив вадидаторов этих типов
      *
+     * @return $this
      * @todo проверка типов валидаторов
      */
     public function setValidator($field, $validators)
@@ -399,6 +400,8 @@ abstract class Som_Model_Abstract
             if (!in_array($val, $this->validators[$field]))
                 $this->validators[$field][] = $val;
         }
+
+        return $this;
     }
 
     /**
