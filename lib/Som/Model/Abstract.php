@@ -74,6 +74,11 @@ abstract class Som_Model_Abstract
         static::$_columns = $columns;
     }
 
+
+    /**
+     * Дополнительная инициализация
+     * @param array $data
+     */
     public function init($data = Array()) {}
 
     /**
@@ -84,13 +89,13 @@ abstract class Som_Model_Abstract
         $className = get_called_class();
         $pkey = static::primaryKey();
 
-        $this->init($data);
-
         // Инициализация полей
         foreach (static::$_columns as $col) {
             if (isset($this->_data))
                 $this->_data[$col] = null;
         }
+
+        $this->init($data);
 
         $this->fields = static::fieldList();
         $this->fields = array_merge($this->fields, static::$_extraFields);

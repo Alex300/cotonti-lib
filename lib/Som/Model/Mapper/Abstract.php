@@ -226,7 +226,7 @@ abstract class Som_Model_Mapper_Abstract
             $calssCols = $columns;
 
         if (!empty($model_name::$fetchJoins)) $joins = $model_name::$fetchJoins;
-        if (!empty($model_name::$fetchСolumns)) $joins = $model_name::$fetchСolumns;
+        if (!empty($model_name::$fetchСolumns)) $addColumns = $model_name::$fetchСolumns;
 
         $columns = array();
         foreach ($calssCols as $col) {
@@ -234,7 +234,7 @@ abstract class Som_Model_Mapper_Abstract
         }
         if (!empty($addColumns)) $columns = array_merge($columns, $addColumns);
         $columns = implode(', ', $columns);
-        $joins = implode(' ', $joins);
+        $joins = implode("\n", $joins);
 
         list($where, $params) = $this->parseConditions($conditions);
 
@@ -244,6 +244,7 @@ abstract class Som_Model_Mapper_Abstract
 
         $objects = array();
         $sql = "SELECT $columns\n FROM {$tq}$table{$tq}\n $joins\n $where\n $order\n $limit";
+
         $res = $this->query($sql, $params);
         if ($res === false) {
             $array = $this->_adapter->errorInfo();
