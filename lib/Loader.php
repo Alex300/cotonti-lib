@@ -124,7 +124,7 @@ class Loader{
          * Search in provided directories, as well as include_path
          */
         $incDirs = array();
-        if(empty($dirs))  $incDirs = explode(PATH_SEPARATOR, get_include_path());
+        if(empty($dirs)) $incDirs = self::explodeIncludePath();
         if(empty($dirs)) $dirs = array();
         $dirs[] = $cfg['modules_dir'];
         $dirs[] = $cfg['plugins_dir'];
