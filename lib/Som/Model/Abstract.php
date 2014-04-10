@@ -83,11 +83,11 @@ abstract class Som_Model_Abstract
         // Инициализация полей
         $this->fields = static::fieldList();
         $this->fields = array_merge($this->fields, static::$_extraFields);
-        foreach ($this->fields as $field) {
+        foreach ($this->fields as $name => $field) {
             if (!isset($field['link']) ||
                 (in_array($field['link']['relation'], array('toone', 'toonenull')) && !isset($field['link']['localKey'])) ){
-                    // Дефолтное значение
-                    $this->_data[$field['name']] = isset($field['default']) ? $field['default'] : null;
+                // Дефолтное значение
+                $this->_data[$name] = isset($field['default']) ? $field['default'] : null;
             }
         }
 
@@ -529,11 +529,11 @@ abstract class Som_Model_Abstract
         $cols = array();
         $fields = array_merge(static::fieldList(), static::$_extraFields);
         // Не включаем связи ко многим и, также, указывающие на другое поле
-        foreach ($fields as $field) {
+        foreach ($fields as $name => $field) {
             if (!isset($field['link']) ||
                 (in_array($field['link']['relation'], array('toone', 'toonenull')) && !isset($field['link']['localKey'])) ){
 
-                $cols[] = $field['name'];
+                $cols[] = $name;
             }
         }
         return $cols;
