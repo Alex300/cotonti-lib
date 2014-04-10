@@ -123,11 +123,13 @@ class Loader{
         /**
          * Search in provided directories, as well as include_path
          */
-        if(empty($dirs))  $dirs = explode(PATH_SEPARATOR, get_include_path());
+        $incDirs = array();
+        if(empty($dirs))  $incDirs = explode(PATH_SEPARATOR, get_include_path());
         if(empty($dirs)) $dirs = array();
         $dirs[] = $cfg['modules_dir'];
         $dirs[] = $cfg['plugins_dir'];
-        $dirs[] = 'lib';
+        $dirs[] = dirname(__FILE__); //'lib' directory;
+        $dirs = array_merge($dirs, $incDirs);
         if(empty($dirs)) return false;
 
         /**
