@@ -516,9 +516,14 @@ abstract class Som_Model_Abstract
 
     /**
      * Получить все поля из БД
+     *
+     * @param bool $real
      * @return array|null
      */
-    public static function getColumns(){
+    public static function getColumns($real = false) {
+
+        if($real) return static::$_db->getFields(static::$_tbname);
+
         $cols = array();
         $fields = array_merge(static::fieldList(), static::$_extraFields);
         // Не включаем связи ко многим и, также, указывающие на другое поле
