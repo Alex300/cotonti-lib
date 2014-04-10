@@ -9,7 +9,6 @@
  * @static string $_dbtype
  * @static string $_tbname
  * @static Som_Model_Mapper_Abstract $_db;
- * @static  array $_columns Список полей в БД
  * @static  string $_primary_key
  * @todo    Модели наблюдатели. При перед удалением модели другие модели оповещаются об этом и могут запретить удаление
  */
@@ -20,8 +19,6 @@ abstract class Som_Model_Abstract
      * @var Som_Model_Mapper_Abstract
      */
     protected static $_db = null;
-
-    protected static $_columns = null;
     protected static $_tbname = null;
     protected static $_primary_key = null;
 
@@ -61,17 +58,11 @@ abstract class Som_Model_Abstract
 
     /**
      * Static constructor
+     * Модель не проверяет наличие таблицы и всех полей, а наивно доверяет данным из метода fieldList()
      */
-    public static function __init($db = 'db')
-    {
-        $columns = Array();
-
+    public static function __init($db = 'db'){
         static::$_dbtype = 'mysql';
         static::$_db = static::getMapper($db);
-
-//        if (!static::tableExists(static::$_tbname)) static::createTable();
-        $columns = static::$_db->getFields(static::$_tbname);
-        static::$_columns = $columns;
     }
 
 
@@ -86,24 +77,26 @@ abstract class Som_Model_Abstract
      */
     public function __construct($data = null)
     {
-        $className = get_called_class();
         $pkey = static::primaryKey();
 
         // Инициализация полей
-        foreach (static::$_columns as $col) {
-            if (isset($this->_data))
-                $this->_data[$col] = null;
+        $this->fields = $fields = static::fieldList();
+        foreach ($this->fields as $field) {
+            if (!isset($field['link']) ||
+                (in_array($field['link']['relation'], array('toone', 'toonenull')) && !isset($field['link']['localKey'])) ){
+                    // Дефолтное значение
+                    $this->_data[$field['name']] = isset($field['default']) ? $field['default'] : null;
+            }
         }
 
         $this->init($data);
 
-        $this->fields = static::fieldList();
         $this->fields = array_merge($this->fields, static::$_extraFields);
 
         // Заполняем существующие поля строго значениями из БД. Никаких сеттеров
         if (!is_null($data)) {
             foreach ($data as $key => $value) {
-                if (in_array($key, static::$_columns))  $this->_data[$key] = $value;
+                if (array_key_exists($key, $fields))  $this->_data[$key] = $value;
             }
         }
 
@@ -228,7 +221,7 @@ abstract class Som_Model_Abstract
             }
         }
 
-        if (in_array($name, static::$_columns))
+        if (in_array($name, static::getColumns()))
             $this->_data[$name] = $val;
     }
 
@@ -523,11 +516,20 @@ abstract class Som_Model_Abstract
 
     /**
      * Получить все поля из БД
-     * @return null
+     * @return array|null
      */
-    public static function getColumns()
-    {
-        return static::$_columns;
+    public static function getColumns(){
+        $cols = array();
+        $fields = static::fieldList();
+        // Не включаем связи ко многим и, также, указывающие на другое поле
+        foreach ($fields as $field) {
+            if (!isset($field['link']) ||
+                (in_array($field['link']['relation'], array('toone', 'toonenull')) && !isset($field['link']['localKey'])) ){
+
+                $cols[] = $field['name'];
+            }
+        }
+        return $cols;
     }
 
     function __toString()
@@ -731,7 +733,7 @@ abstract class Som_Model_Abstract
 
         if (empty($fields)) {
             // Получить все поля модели
-            $fields = static::$_columns;
+            $fields = static::getColumns();
             foreach ($this->fields as $name => $fld) {
                 if (!in_array($name, $fields))
                     $fields[] = $name;
