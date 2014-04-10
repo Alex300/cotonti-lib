@@ -81,7 +81,7 @@ abstract class Som_Model_Abstract
         $pkey = static::primaryKey();
 
         // Инициализация полей
-        $this->fields = $fields = static::fieldList();
+        $this->fields = static::fieldList();
         $this->fields = array_merge($this->fields, static::$_extraFields);
         foreach ($this->fields as $field) {
             if (!isset($field['link']) ||
@@ -96,7 +96,7 @@ abstract class Som_Model_Abstract
         // Заполняем существующие поля строго значениями из БД. Никаких сеттеров
         if (!is_null($data)) {
             foreach ($data as $key => $value) {
-                if (array_key_exists($key, $fields))  $this->_data[$key] = $value;
+                if (in_array($key, static::getColumns())) $this->_data[$key] = $value;
             }
         }
 
