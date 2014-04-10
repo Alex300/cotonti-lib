@@ -449,10 +449,12 @@ abstract class Som_Model_Abstract
         return static::$_tbname;
     }
 
-    public function getId()
-    {
+    /**
+     * Получить значение первичного ключа
+     * @return int
+     */
+    public function getId() {
         $pkey = static::primaryKey();
-
         if (empty($this->_data[$pkey])) return false;
 
         return $this->_data[$pkey];
@@ -517,7 +519,7 @@ abstract class Som_Model_Abstract
     /**
      * Получить все поля из БД
      *
-     * @param bool $real
+     * @param bool $real получить поля напрямую из таблицы
      * @return array|null
      */
     public static function getColumns($real = false) {
@@ -630,24 +632,23 @@ abstract class Som_Model_Abstract
     }
 
     /**
-     *
-     * @param array $cond
-     * @param null $order
-     * @param string $way
-     *
-     * @internal param array $sort
-     *
+     * Получение единственного значения
+     * @param array  $cond
+     * @param null   $order
      * @return Som_Model_Abstract
      */
-    public static function fetchOne($cond, $order = null)
-    {
+    public static function fetchOne($cond, $order = null) {
+        /** @var Som_Model_Abstract $className */
         $className = get_called_class();
-        $res = null;
-        $limit = 1;
-        $offset = 0;
-        eval('$res = ' . $className . '::fetch($cond, $limit, $offset, $order);');
 
-        return ($res) ? $res[0] : null;
+        $res = $className::fetch($cond, 1, 0, $order);
+        if(!$res) return null;
+
+        $res = $res[0];
+
+        self::$_stCache[$className][$res->getId()] = $res;
+
+        return $res;
     }
 
     /**
