@@ -46,7 +46,8 @@ abstract class Som_Model_Abstract
     protected $fields = array();
 
     /**
-     * Model extrafields
+     * Model extrafields. Поля присутсвубщие в таблице, но не описанные в fieldList().
+     * Они могут быть созданы другими модулями
      * @var array
      */
     public static $_extraFields = array();
@@ -81,6 +82,7 @@ abstract class Som_Model_Abstract
 
         // Инициализация полей
         $this->fields = $fields = static::fieldList();
+        $this->fields = array_merge($this->fields, static::$_extraFields);
         foreach ($this->fields as $field) {
             if (!isset($field['link']) ||
                 (in_array($field['link']['relation'], array('toone', 'toonenull')) && !isset($field['link']['localKey'])) ){
@@ -90,8 +92,6 @@ abstract class Som_Model_Abstract
         }
 
         $this->init($data);
-
-        $this->fields = array_merge($this->fields, static::$_extraFields);
 
         // Заполняем существующие поля строго значениями из БД. Никаких сеттеров
         if (!is_null($data)) {
@@ -520,7 +520,7 @@ abstract class Som_Model_Abstract
      */
     public static function getColumns(){
         $cols = array();
-        $fields = static::fieldList();
+        $fields = array_merge(static::fieldList(), static::$_extraFields);
         // Не включаем связи ко многим и, также, указывающие на другое поле
         foreach ($fields as $field) {
             if (!isset($field['link']) ||
