@@ -220,9 +220,19 @@ abstract class Som_Model_Abstract
                 }
             }
         }
-
-        if (in_array($name, static::getColumns()))
+        if (in_array($name, static::getColumns())) {
+            switch ($this->fields[$name]['type']) {
+                case 'int':
+                case 'bigint':
+                    if(!( is_int($val) || ctype_digit($val) )) $val = null;
+//
+                    break;
+                case 'bool':
+                    if(!is_null($val)) $val = (bool)$val;
+                    break;
+            }
             $this->_data[$name] = $val;
+        }
     }
 
     /**
