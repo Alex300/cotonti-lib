@@ -643,15 +643,15 @@ abstract class Som_Model_Abstract
 
     /**
      * Получение единственного значения
-     * @param array  $cond
+     * @param array  $conditions
      * @param null   $order
      * @return Som_Model_Abstract
      */
-    public static function fetchOne($cond, $order = null) {
+    public static function fetchOne($conditions = array(), $order = null) {
         /** @var Som_Model_Abstract $className */
         $className = get_called_class();
 
-        $res = $className::fetch($cond, 1, 0, $order);
+        $res = $className::fetch($conditions, 1, 0, $order);
         if(!$res) return null;
 
         $res = $res[0];
@@ -660,6 +660,7 @@ abstract class Som_Model_Abstract
 
         return $res;
     }
+
 
     /**
      * Retrieve all existing objects from database
