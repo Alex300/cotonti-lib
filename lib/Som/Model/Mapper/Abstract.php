@@ -897,17 +897,27 @@ abstract class Som_Model_Mapper_Abstract
             $xPk = $xModel::primaryKey();
             $linkModelDbInfo = $xModel::getDbConfig();
 
-            $xModelName = $linkModelDbInfo['tbname'];
+            $xTableName = $linkModelDbInfo['tbname'];
         }
-        $xPKey = mb_strtolower($xModelName . '_' . $xPk);
+        else if ($xModel instanceof Som_Model_Abstract)
+        {
+            $xPk = $xModel::primaryKey();
+            $xTableName= $xModel->getTbName();
+        }
+        else
+            return false;
+
+        $xPKey = mb_strtolower($xTableName . '_' . $xPk);
 
         $modelName = $this->_dbinfo['class'];
         $tableName = $this->_dbinfo['tbname'];
         $pk = $this->_dbinfo['pkey'];
-        $pKey = mb_strtolower($modelName . '_' . $pk);
+        //$pKey = mb_strtolower($modelName . '_' . $pk);
+        $pKey = mb_strtolower($tableName . '_' . $pk);
 
-        $xRefTableName1 = mb_strtolower("{$tableName}_link_{$xModelName}");
-        $xRefTableName2 = mb_strtolower("{$xModelName}_link_{$tableName}");
+
+        $xRefTableName1 = mb_strtolower("{$tableName}_link_{$xTableName}");
+        $xRefTableName2 = mb_strtolower("{$xTableName}_link_{$tableName}");
 
         $xRefTable = false;
         if ($this->tableExists($xRefTableName1)) {
