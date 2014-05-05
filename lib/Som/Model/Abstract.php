@@ -353,11 +353,12 @@ abstract class Som_Model_Abstract
      * Заполняет модель данными
      *
      * @param array|Som_Model_Abstract $data
+     * @param bool $safe безопасный режим
      *
      * @throws Exception
      * @return bool
      */
-    public function setData($data)
+    public function setData($data, $safe=true)
     {
         if ($this->beforeSetData($data)) {
             $class = get_class($this);
@@ -367,6 +368,11 @@ abstract class Som_Model_Abstract
                 throw new  Exception("Data must be an Array or instance of $class Class");
             }
             foreach ($data as $key => $value) {
+                if ($safe && isset ($this->fields[$key]['safe']) && $this->fields[$key]['safe']){
+                    if(!cot::$usr['isadmin'] && cot::$env['ext'] != 'admin'){
+                        throw new Exception("Trying to write value «{$value}» in protected field «{$key}» of model «{$class}»");
+                    }
+                }
                 $this->__set($key, $value);
             }
         }
