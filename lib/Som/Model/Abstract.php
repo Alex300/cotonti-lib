@@ -385,6 +385,40 @@ abstract class Som_Model_Abstract
     protected function afterSetData($data){}
 
 
+    /**
+     * Increment
+     * @param   array      $pair array(array(key,val))
+     * @param array|string $conditions
+     *
+     * @return mixed
+     */
+    public function inc($pair = array(), $conditions = '') {
+        if (!empty($pair)) {
+            foreach ($pair as $v)
+                $this->_data[$v[0]] = $this->_data[$v[0]] + $v[1];
+
+            return static::$_db->inc($this->getTbName(), $pair,
+                " {$this->primaryKey()} = {$this->getId()} " .$conditions);
+        }
+    }
+
+    /**
+     * Decrement
+     * @param   array      $pair array(array(key,val))
+     * @param array|string $conditions
+     *
+     * @return mixed
+     */
+    public function dec($pair = array(), $conditions = array()) {
+        if (!empty($pair)) {
+            foreach ($pair as $v)
+                $this->_data[$v[0]] = $this->_data[$v[0]] - $v[1];
+
+            return static::$_db->dec($this->getTbName(), $pair,
+                " {$this->primaryKey()} = {$this->getId()} " .$conditions);
+        }
+    }
+
     public function getValidators($field = null)
     {
         if (!empty($field)) {

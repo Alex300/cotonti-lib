@@ -575,6 +575,48 @@ abstract class Som_Model_Mapper_Abstract
     }
 
     /**
+     * Increment
+     * @param $tablename
+     * @param array $pair
+     * @param string $conditions
+     */
+    public function inc($tablename, $pair = array(), $conditions = '') {
+        $this->incdec($tablename, $pair, $conditions, true);
+    }
+
+    /**
+     * Decrement
+     * @param $tablename
+     * @param array $pair
+     * @param string $conditions
+     */
+    public function dec($tablename, $pair = array(), $conditions = '') {
+        $this->incdec($tablename, $pair, $conditions, false);
+    }
+
+    protected function incdec($tablename, $pairs = array(), $conditions = '', $inc = true) {
+        if (!empty($pairs)) {
+            $model     = null;
+            $tq        = $this->tableQuote;
+            $id        = null;
+            $conditions = empty($conditions) ? '' : 'WHERE ' . $conditions;
+            $pairupd   = array();
+            foreach ($pairs as $pair) {
+                $pairupd [] = " $pair[0] = $pair[0] " . ($inc ? '+ ' : '- ') . $pair[1];
+            }
+            $upd   = implode(',', $pairupd);
+            $query = "UPDATE {$tq}$tablename{$tq} SET $upd $conditions";
+            $res   = $this->_adapter->exec($query);
+            if ($res === false) {
+                $array = $this->_adapter->errorInfo();
+                throw new Exception('SQL Error: ' . $array[2]);
+            }
+
+            return 0;
+        }
+    }
+
+    /**
      * Создать поле
      * @param array $field
      * @param string $table
