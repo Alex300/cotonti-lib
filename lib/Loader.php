@@ -1,11 +1,14 @@
 <?php
 /**
- * Автозагрузчик
+ * Autoloader
  * @author Kalnov Alexey http://portal30.ru
  */
 class Loader{
 
-    public static function registerMe(){
+    /**
+     * Register the autoloader with spl_autoload_register()
+     */
+    public static function register(){
 
         static $registered = false;
         if(!$registered){
