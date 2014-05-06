@@ -370,7 +370,7 @@ abstract class Som_Model_Abstract
             foreach ($data as $key => $value) {
                 if ($safe && isset ($this->fields[$key]['safe']) && $this->fields[$key]['safe']){
                     if(!cot::$usr['isadmin'] && cot::$env['ext'] != 'admin'){
-                        throw new Exception("Trying to write value «{$value}» in protected field «{$key}» of model «{$class}»");
+                        throw new Exception("Trying to write value «{$value}» to protected field «{$key}» of model «{$class}»");
                     }
                 }
                 $this->__set($key, $value);
