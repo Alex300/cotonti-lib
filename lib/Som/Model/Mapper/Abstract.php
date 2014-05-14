@@ -895,6 +895,13 @@ abstract class Som_Model_Mapper_Abstract
         }
     }
 
+    /**
+     * Загрузить связи
+     * @param string|Som_Model_Abstract $xModel
+     * @param $id
+     * @param string $fieldName
+     * @return array|bool|null
+     */
     public function loadXRef($xModel, $id, $fieldName = '')
     {
         $tq = $this->tableQuote;
@@ -933,6 +940,15 @@ abstract class Som_Model_Mapper_Abstract
         return $xRefs;
     }
 
+    /**
+     * Сохранить связи
+     * @param string|Som_Model_Abstract $xModel
+     * @param $id
+     * @param $data
+     * @param string $fieldName
+     * @return bool
+     * @throws Exception
+     */
     protected function saveXRef($xModel, $id, $data, $fieldName = '')
     {
         $tq = $this->tableQuote;
@@ -948,10 +964,8 @@ abstract class Som_Model_Mapper_Abstract
         }
         $xPKey = mb_strtolower($xTableName . '_' . $xPk);
 
-        $modelName = $this->_dbinfo['class'];
         $tableName = $this->_dbinfo['tbname'];
         $pk = $this->_dbinfo['pkey'];
-        //$pKey = mb_strtolower($modelName . '_' . $pk);
         $pKey = mb_strtolower($tableName . '_' . $pk);
 
 
@@ -1042,29 +1056,32 @@ abstract class Som_Model_Mapper_Abstract
 
     /**
      * Удалить связи
-     * @param $xModel
+     * @param string|Som_Model_Abstract $xModel
      * @param $id
      * @param string $fieldName
+     * @return bool
      */
     protected function deleteXRef($xModel, $id, $fieldName = '')
     {
         $tq = $this->tableQuote;
 
-        if (is_string($xModel)) {
+        if (is_string($xModel) || ($xModel instanceof Som_Model_Abstract)) {
+            /** @var Som_Model_Abstract $xModel */
             $xPk = $xModel::primaryKey();
             $linkModelDbInfo = $xModel::getDbConfig();
 
-            $xModelName = $linkModelDbInfo['tbname'];
+            $xTableName = $linkModelDbInfo['tbname'];
+        }else{
+            return false;
         }
-        $xPKey = mb_strtolower($xModelName . '_' . $xPk);
+        $xPKey = mb_strtolower($xTableName . '_' . $xPk);
 
-        $modelName = $this->_dbinfo['class'];
         $tableName = $this->_dbinfo['tbname'];
         $pk = $this->_dbinfo['pkey'];
-        $pKey = mb_strtolower($modelName . '_' . $pk);
+        $pKey = mb_strtolower($tableName . '_' . $pk);
 
-        $xRefTableName1 = mb_strtolower("{$tableName}_link_{$xModelName}");
-        $xRefTableName2 = mb_strtolower("{$xModelName}_link_{$tableName}");
+        $xRefTableName1 = mb_strtolower("{$tableName}_link_{$xTableName}");
+        $xRefTableName2 = mb_strtolower("{$xTableName}_link_{$tableName}");
 
         if ($this->tableExists($xRefTableName1)) {
             $this->delete($xRefTableName1, "{$pKey}=$id AND {$tq}name{$tq}='{$fieldName}'");
