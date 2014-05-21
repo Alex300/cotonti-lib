@@ -71,7 +71,7 @@ abstract class Som_Model_Abstract
      * Дополнительная инициализация
      * @param array $data
      */
-    public function init($data = Array()) {}
+    public function init(&$data = Array()) {}
 
     /**
      * @param Som_Model_Abstract|array $data данные для инициализации модели
