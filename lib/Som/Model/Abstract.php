@@ -397,7 +397,7 @@ abstract class Som_Model_Abstract
             foreach ($pair as $v)
                 $this->_data[$v[0]] = $this->_data[$v[0]] + $v[1];
 
-            return static::$_db->inc($this->getTbName(), $pair,
+            return static::$_db->inc(static::$_tbname, $pair,
                 " {$this->primaryKey()} = {$this->getId()} " .$conditions);
         }
     }
@@ -414,7 +414,7 @@ abstract class Som_Model_Abstract
             foreach ($pair as $v)
                 $this->_data[$v[0]] = $this->_data[$v[0]] - $v[1];
 
-            return static::$_db->dec($this->getTbName(), $pair,
+            return static::$_db->dec(static::$_tbname, $pair,
                 " {$this->primaryKey()} = {$this->getId()} " .$conditions);
         }
     }
@@ -453,7 +453,7 @@ abstract class Som_Model_Abstract
     }
 
     /**
-     * Возвращает описание атрибута
+     * Возвращает описание поля
      *
      * @param $attribute
      *
@@ -494,13 +494,16 @@ abstract class Som_Model_Abstract
 
     }
 
-    public function getTableName()
-    {
+    /**
+     * Get Table Name
+     * @return string
+     */
+    public static function getTableName(){
         return static::$_tbname;
     }
 
     /**
-     * Получить значение первичного ключа
+     * Get Primary Key
      * @return int
      */
     public function getId() {
