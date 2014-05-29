@@ -693,14 +693,10 @@ abstract class Som_Model_Abstract
     public static function fetchOne($conditions = array(), $order = null) {
         /** @var Som_Model_Abstract $className */
         $className = get_called_class();
-
         $res = $className::fetch($conditions, 1, 0, $order);
         if(!$res) return null;
-
-        $res = $res[0];
-
+        $res = current($res);
         self::$_stCache[$className][$res->getId()] = $res;
-
         return $res;
     }
 
