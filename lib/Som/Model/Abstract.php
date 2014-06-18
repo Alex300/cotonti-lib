@@ -295,6 +295,10 @@ abstract class Som_Model_Abstract
      */
     public function __isset($column)
     {
+        $methodName = 'isset' . ucfirst($column);
+        if (method_exists($this, $methodName)) {
+            return $this->$methodName();
+        }
 
         // Проверка на наличие связей
         if (isset($this->fields[$column]) && $this->fields[$column]['type'] == 'link') {
@@ -324,6 +328,11 @@ abstract class Som_Model_Abstract
      */
     public function __unset($column)
     {
+        $methodName = 'unset' . ucfirst($column);
+        if (method_exists($this, $methodName)) {
+            return $this->$methodName();
+        }
+
         // Проверка на наличие связей
         if (isset($this->fields[$column]) && $this->fields[$column]['type'] == 'link') {
             $list = (array)$this->fields[$column]['link'];
