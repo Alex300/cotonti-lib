@@ -684,13 +684,11 @@ abstract class Som_Model_Abstract
             return self::$_stCache[$className][$pk];
         }
         $pkey = static::primaryKey();
-        $res  = static::fetch(array(
-            array( $pkey, $pk )
-        ), 1);
+        $res  = static::fetch(array(array( $pkey, $pk )), 1);
 
-        if ($StaticCache && !empty($res)) self::$_stCache[$className][$pk] = $res[0];
+        if ($StaticCache && !empty($res)) self::$_stCache[$className][$pk] = current($res);
 
-        return ($res) ? $res[0] : null;
+        return ($res) ? current($res) : null;
     }
 
     /**
