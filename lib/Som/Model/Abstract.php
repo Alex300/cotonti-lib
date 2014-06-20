@@ -743,29 +743,49 @@ abstract class Som_Model_Abstract
         return static::$_db->getCount(false, $conditions);
     }
 
-    public function isRequired($fieldName)
-    {
-        $validators = $this->validators();
+    /**
+     * Является ли поле обязательным
+     * @param string $field
+     * @return bool
+     */
+    public function isRequired($field) {
+        return in_array($field, $this->requiredFields());
+    }
 
-        $m_validators = array();
+    protected function validators(){ return array(); }
+
+    /**
+     * Возвращает список названий полей, обязательных для заполнения
+     * @return array
+     */
+    public function requiredFields() {
+        $requiredFields = array();
+        $validators   = $this->validators();
         foreach ($validators as $params) {
             $fieldList = $params[0];
             unset($params[0]);
             $fieldList = explode(",", $fieldList);
             $fieldList = array_map("trim", $fieldList);
-
             foreach ($fieldList as $field) {
                 foreach ($params as $validators) {
-                    if ($validators == 'required') $m_validators[$field] = 1;
+                    if ($validators == 'required') $requiredFields[] = $field;
                 }
             }
         }
-        return isset($m_validators[$fieldName]);
-    }
 
-    public function validators()
-    {
-        return array();
+        $fields = $this->getFields();
+        foreach ($fields as $name => $field) {
+            if ($name !== static::$_primary_key) {
+                if (isset($field['nullable']) && !$field['nullable']) $requiredFields[] = $name;
+
+                if (isset ($field['type']) && ($field['type'] == 'link')
+                    && (in_array($field['link']['relation'], array('tomany', 'toone'))) ) {
+                    $requiredFields[] = $name;
+                }
+            }
+        }
+
+        return $requiredFields;
     }
 
     /**
@@ -779,6 +799,10 @@ abstract class Som_Model_Abstract
     public function validate($fields = null)
     {
         $validators = $this->validators();
+
+        foreach($this->requiredFields() as $field){
+            $validators[] = array($field, 'required');
+        }
 
         $m_validators = array();
         foreach ($validators as $params) {
