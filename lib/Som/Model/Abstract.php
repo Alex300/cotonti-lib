@@ -110,43 +110,7 @@ abstract class Som_Model_Abstract
         }
     }
 
-    /**
-     * Add extrafield to model
-     * @param array $params field params
-     * @param string $donor Module which adds a new field. (Так удобднее отчслеживать кто и что добавило поле в модель)
-     *      И для кодогенератора это знак, что поле дополнительное
-     * @param bool $chekAdded throw Exeption if field already added
-     * @throws Exception
-     */
-    public static function addFieldToAll($params, $donor, $chekAdded = true ){
-
-        if(empty($params)){
-            throw new Exception('Fields params are undefined');
-        }
-
-        if(empty($donor)){
-            throw new Exception('$donor is undefined. Please write here module name which adds a new field.');
-        }
-
-        if(is_string($params)) $params = array('name' => $params);
-
-        if(empty($params['name'])){
-            throw new Exception('Field name is undefined');
-        }
-
-        if(array_key_exists($params['name'], static::fieldList())){
-            throw new Exception("Field «{$params['name']}» already exists in model fields list");
-        }
-
-        if($chekAdded && array_key_exists($params['name'], static::$_extraFields)){
-            throw new Exception("Field «{$params['name']}» already added to model by «".
-                static::$_extraFields[$params['name']]['donor']."»");
-        }
-
-        $params['donor'] = $donor;
-        static::$_extraFields[$params['name']] = $params;
-    }
-
+    // ==== Методы для манипуляции с данными ====
     /**
      * Возвращает элемент в виде массива
      *
@@ -427,244 +391,10 @@ abstract class Som_Model_Abstract
                 " {$this->primaryKey()} = {$this->getId()} " .$conditions);
         }
     }
-
-    public function getValidators($field = null)
-    {
-        if (!empty($field)) {
-            if (!empty($this->validators[$field]) && count($this->validators[$field]) > 0) {
-                return $this->validators[$field];
-            } else {
-                return null;
-            }
-        }
-
-        return $this->validators;
-    }
-
-    /**
-     * @param string $field
-     * @param mixed callback, или string ('int', 'bool', ect) или массив вадидаторов этих типов
-     *
-     * @return $this
-     * @todo проверка типов валидаторов
-     */
-    public function setValidator($field, $validators)
-    {
-        if (!is_array($validators))
-            $validators = array($validators);
-
-        foreach ($validators as $val) {
-            if (!in_array($val, $this->validators[$field]))
-                $this->validators[$field][] = $val;
-        }
-
-        return $this;
-    }
-
-    /**
-     * Возвращает описание поля
-     *
-     * @param $attribute
-     *
-     * @return string
-     */
-    public function getFieldLabel($attribute)
-    {
-        if (isset($this->fields[$attribute]['description'])) return $this->fields[$attribute]['description'];
-
-        return '';
-    }
-
-    public function hasErrors()
-    {
-
-    }
-
-    /**
-     * Фабрика мапперов
-     * @param string $db connection name
-     * @throws Exception
-     * @return Som_Model_Mapper_Abstract
-     */
-    public static function getMapper($db = 'db')
-    {
-        $className = get_called_class();
-
-        if (!empty(static::$_tbname) && isset(static::$_dbtype)) {
-            return Som_Model_Mapper_Manager::getMapper(array(
-                "class" => get_called_class(),
-                "tbname" => static::$_tbname,
-                "pkey" => static::primaryKey(),
-            ), $db);
-        } else {
-            throw new Exception("Не верно заданы параметры модели: $className");
-        }
+    // ==== /Методы для манипуляции с данными ====
 
 
-    }
-
-    /**
-     * Get Table Name
-     * @return string
-     */
-    public static function getTableName(){
-        return static::$_tbname;
-    }
-
-    /**
-     * Get Primary Key
-     * @return int
-     */
-    public function getId() {
-        $pkey = static::primaryKey();
-        if (empty($this->_data[$pkey])) return false;
-
-        return $this->_data[$pkey];
-    }
-
-    /**
-     * Returns primary key column name. Defaults to 'id' if none was set.
-     *
-     * @return string
-     */
-    public static function primaryKey(){
-        return isset(static::$_primary_key) ? static::$_primary_key : 'id';
-    }
-
-
-    /**
-     * Получить настройки DB
-     * @return array
-     */
-    public static function getDbConfig()
-    {
-        return array(
-            "dbtype" => static::$_dbtype,
-            "tbname" => static::$_tbname,
-            "pkey" => static::primaryKey()
-        );
-    }
-
-    /**
-     * Возвращает все поля, включая дополнительные
-     * @return array
-     */
-    public function getFields()
-    {
-        return $this->fields;
-    }
-
-    /**
-     * Получить поле по названию или по связи
-     *   если полей с заданной связью несколько - вернет первое
-     * @param $params
-     * @return null
-     */
-    public function getField($params)
-    {
-        if (is_string($params)) return (!empty($this->fields[$params])) ? $this->fields[$params] : null;
-        // Если передали объект, надо искать связь
-        if (is_a($params, 'Som_Model_Abstract')) $params = array('model' => get_class($params));
-
-        if (!empty($params['model'])) {
-            if (is_a($params['model'], 'Som_Model_Abstract')) $params['model'] = get_class($params['model']);
-            foreach ($this->fields as $fld) {
-                if ($fld['type'] == 'link' && $fld['model'] == $params['model']) {
-                    return $fld;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Получить все поля из БД
-     *
-     * @param bool $real получить поля напрямую из таблицы
-     * @return array|null
-     */
-    public static function getColumns($real = false) {
-
-        if($real) return static::$_db->getFields(static::$_tbname);
-
-        $cols = array();
-        $fields = array_merge(static::fieldList(), static::$_extraFields);
-        // Не включаем связи ко многим и, также, указывающие на другое поле
-        foreach ($fields as $name => $field) {
-            if (!isset($field['link']) ||
-                (in_array($field['link']['relation'], array('toone', 'toonenull')) && !isset($field['link']['localKey'])) ){
-
-                $cols[] = $name;
-            }
-        }
-        return $cols;
-    }
-
-    function __toString()
-    {
-        return $this->getId();
-    }
-
-    protected function beforeDelete(){ return true; }
-
-    /**
-     * @access public
-     */
-    public function delete()
-    {
-        $className = get_called_class();
-
-        if (!$this->validateDelete() || !$this->beforeDelete()) return false;
-
-        static::$_db->delete($this);
-        unset(self::$_stCache[$className][$this->getId()]);
-
-        $this->afterDelete();
-
-        unset($this);
-
-        return true;
-    }
-
-    protected function afterDelete(){ return true; }
-
-    protected function beforeSave($data){ return true; }
-
-    /**
-     * Save data
-     *
-     * @param Som_Model_Mapper_Abstract|array|null $data
-     *
-     * @return int id of saved record
-     */
-    public function save($data = null)
-    {
-        if ($this->beforeSave($data)) {
-            if (is_array($data)) {
-                $this->setData($data);
-            }
-
-            if (!$this->validate()) return false;
-
-            if ($this->getId() === false) {
-
-                // Добавить новый
-                $id = $this->insert();
-            } else {
-                // Сохранить существующий
-                $id = $this->getId();
-                $this->update();
-            }
-        }
-
-        if($id) $this->afterSave();
-
-        return $id;
-    }
-
-    protected function afterSave(){}
-
+    // ==== Методы для чтения и записи в БД ====
     /**
      * Retrieve existing object from database by primary key
      *
@@ -731,6 +461,120 @@ abstract class Som_Model_Abstract
     }
 
     /**
+     *
+     * @param string|array $conditions
+     * @param int $limit Maximum number of returned objects
+     * @param int $offset Offset from where to begin returning objects
+     * @param string $order Column name to order on
+     *
+     * @return Som_Model_Abstract[]
+     */
+    protected static function fetch($conditions = array(), $limit = 0, $offset = 0, $order = '')
+    {
+        return static::$_db->fetch($conditions, $limit, $offset, $order);
+    }
+
+    protected function beforeSave($data){ return true; }
+
+    /**
+     * Save data
+     *
+     * @param Som_Model_Mapper_Abstract|array|null $data
+     *
+     * @return int id of saved record
+     */
+    public function save($data = null)
+    {
+        if ($this->beforeSave($data)) {
+            if (is_array($data)) {
+                $this->setData($data);
+            }
+
+            if (!$this->validate()) return false;
+
+            if ($this->getId() === false) {
+
+                // Добавить новый
+                $id = $this->insert();
+            } else {
+                // Сохранить существующий
+                $id = $this->getId();
+                $this->update();
+            }
+        }
+
+        if($id) $this->afterSave();
+
+        return $id;
+    }
+
+    protected function afterSave(){}
+
+    protected function beforeInsert(){ return true; }
+
+    /**
+     * Создать объект
+     * @return int id Созданного объекта
+     */
+    protected final function insert(){
+        if($this->beforeInsert()){
+            $id = static::$_db->insert($this);
+
+            if($id) $this->afterInsert();
+
+            return $id;
+        }else{
+            return null;
+        }
+
+    }
+
+    protected function afterInsert(){ }
+
+
+    protected function beforeUpdate(){ return true; }
+
+    /**
+     * Обновить объект
+     */
+    protected final function update(){
+        $className = get_called_class();
+
+        if($this->beforeUpdate()){
+            if (static::$_db->update($this) === 0) return 0;
+            unset(self::$_stCache[$className][$this->getId()]);
+            $this->afterUpdate();
+        }else{
+            return null;
+        }
+    }
+
+    protected function afterUpdate(){ }
+
+    protected function beforeDelete(){ return true; }
+
+    /**
+     * @access public
+     */
+    public function delete()
+    {
+        $className = get_called_class();
+
+        if (!$this->validateDelete() || !$this->beforeDelete()) return false;
+
+        static::$_db->delete($this);
+        unset(self::$_stCache[$className][$this->getId()]);
+
+        $this->afterDelete();
+
+        unset($this);
+
+        return true;
+    }
+
+    protected function afterDelete(){ return true; }
+
+    /**
      * Получить количество элементов, соотвествующих условию
      * @param array $conditions
      *
@@ -741,16 +585,118 @@ abstract class Som_Model_Abstract
         return static::$_db->getCount(false, $conditions);
     }
 
-    /**
-     * Является ли поле обязательным
-     * @param string $field
-     * @return bool
-     */
-    public function isRequired($field) {
-        return in_array($field, $this->requiredFields());
+
+    public static function tableExists($table)
+    {
+        return static::$_db->tableExists();
     }
 
-    protected function validators(){ return array(); }
+    public static function createTable()
+    {
+        return static::$_db->createTable(false, static::fieldList());
+    }
+
+    public static function fieldExists($field)
+    {
+        // тут можно вернуть информацию из поля columns
+        return static::$_db->fieldExists($field);
+    }
+
+    public static function createField($field)
+    {
+        return static::$_db->createField($field);
+    }
+
+    public static function alterField($old, $new = false)
+    {
+        return static::$_db->alterField($old, $new);
+    }
+
+    public static function deleteField($field)
+    {
+        return static::$_db->deleteField($field);
+    }
+    // ==== /Методы для чтения и записи  в БД ====
+
+
+    // ==== Методы для работы с полями ====
+    /**
+     * Возвращает описание поля
+     * @param $column
+     * @return string
+     */
+    public function getFieldLabel($column)
+    {
+        if (isset($this->fields[$column]['description'])) return $this->fields[$column]['description'];
+
+        return '';
+    }
+
+    /**
+     * Возвращает все поля, включая дополнительные
+     * @return array
+     */
+    public function getFields()
+    {
+        return $this->fields;
+    }
+
+    /**
+     * Получить поле по названию или по связи
+     *   если полей с заданной связью несколько - вернет первое
+     * @param $params
+     * @return null
+     */
+    public function getField($params)
+    {
+        if (is_string($params)) return (!empty($this->fields[$params])) ? $this->fields[$params] : null;
+        // Если передали объект, надо искать связь
+        if (is_a($params, 'Som_Model_Abstract')) $params = array('model' => get_class($params));
+
+        if (!empty($params['model'])) {
+            if (is_a($params['model'], 'Som_Model_Abstract')) $params['model'] = get_class($params['model']);
+            foreach ($this->fields as $fld) {
+                if ($fld['type'] == 'link' && $fld['model'] == $params['model']) {
+                    return $fld;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Получить все поля из БД
+     *
+     * @param bool $real получить поля напрямую из таблицы
+     * @return array|null
+     */
+    public static function getColumns($real = false) {
+
+        if($real) return static::$_db->getFields(static::$_tbname);
+
+        $cols = array();
+        $fields = array_merge(static::fieldList(), static::$_extraFields);
+        // Не включаем связи ко многим и, также, указывающие на другое поле
+        foreach ($fields as $name => $field) {
+            if (!isset($field['link']) ||
+                (in_array($field['link']['relation'], array('toone', 'toonenull')) && !isset($field['link']['localKey'])) ){
+
+                $cols[] = $name;
+            }
+        }
+        return $cols;
+    }
+
+    /**
+     * Получить значение поля "Как есть"
+     * @param $column
+     * @return mixed
+     */
+    public function rawValue($column){
+        if(isset($this->_data[$column])) return $this->_data[$column];
+        return null;
+    }
 
     /**
      * Возвращает список названий полей, обязательных для заполнения
@@ -784,6 +730,95 @@ abstract class Som_Model_Abstract
         }
 
         return $requiredFields;
+    }
+
+    /**
+     * Является ли поле обязательным
+     * @param string $field
+     * @return bool
+     */
+    public function isRequired($field) {
+        return in_array($field, $this->requiredFields());
+    }
+
+    /**
+     * Add extrafield to model
+     * @param array $params field params
+     * @param string $donor Module which adds a new field. (Так удобднее отчслеживать кто и что добавило поле в модель)
+     *      И для кодогенератора это знак, что поле дополнительное
+     * @param bool $chekAdded throw Exeption if field already added
+     * @throws Exception
+     */
+    public static function addFieldToAll($params, $donor, $chekAdded = true ){
+
+        if(empty($params)){
+            throw new Exception('Fields params are undefined');
+        }
+
+        if(empty($donor)){
+            throw new Exception('$donor is undefined. Please write here module name which adds a new field.');
+        }
+
+        if(is_string($params)) $params = array('name' => $params);
+
+        if(empty($params['name'])){
+            throw new Exception('Field name is undefined');
+        }
+
+        if(array_key_exists($params['name'], static::fieldList())){
+            throw new Exception("Field «{$params['name']}» already exists in model fields list");
+        }
+
+        if($chekAdded && array_key_exists($params['name'], static::$_extraFields)){
+            throw new Exception("Field «{$params['name']}» already added to model by «".
+                static::$_extraFields[$params['name']]['donor']."»");
+        }
+
+        $params['donor'] = $donor;
+        static::$_extraFields[$params['name']] = $params;
+    }
+
+    // ==== /Методы для работы с полями ====
+
+    // ==== Методы для Валидации ====
+    protected function validators(){ return array(); }
+
+    public function getValidators($field = null)
+    {
+        if (!empty($field)) {
+            if (!empty($this->validators[$field]) && count($this->validators[$field]) > 0) {
+                return $this->validators[$field];
+            } else {
+                return null;
+            }
+        }
+
+        return $this->validators;
+    }
+
+    /**
+     * @param string $field
+     * @param mixed callback, или string ('int', 'bool', ect) или массив вадидаторов этих типов
+     *
+     * @return $this
+     * @todo проверка типов валидаторов
+     */
+    public function setValidator($field, $validators)
+    {
+        if (!is_array($validators))
+            $validators = array($validators);
+
+        foreach ($validators as $val) {
+            if (!in_array($val, $this->validators[$field]))
+                $this->validators[$field][] = $val;
+        }
+
+        return $this;
+    }
+
+    public function hasErrors()
+    {
+
     }
 
     /**
@@ -902,94 +937,73 @@ abstract class Som_Model_Abstract
     {
         return true;
     }
+    // ==== /Методы для Валидации ====
 
     /**
-     *
-     * @param string|array $conditions
-     * @param int $limit Maximum number of returned objects
-     * @param int $offset Offset from where to begin returning objects
-     * @param string $order Column name to order on
-     *
-     * @return Som_Model_Abstract[]
+     * Фабрика мапперов
+     * @param string $db connection name
+     * @throws Exception
+     * @return Som_Model_Mapper_Abstract
      */
-    protected static function fetch($conditions = array(), $limit = 0, $offset = 0, $order = '')
+    public static function getMapper($db = 'db')
     {
-        return static::$_db->fetch($conditions, $limit, $offset, $order);
-    }
-
-
-    protected function beforeInsert(){ return true; }
-
-    /**
-     * Создать объект
-     * @return int id Созданного объекта
-     */
-    protected final function insert(){
-        if($this->beforeInsert()){
-            $id = static::$_db->insert($this);
-
-            if($id) $this->afterInsert();
-
-            return $id;
-        }else{
-            return null;
-        }
-
-    }
-
-    protected function afterInsert(){ }
-
-
-    protected function beforeUpdate(){ return true; }
-
-    /**
-     * Обновить объект
-     */
-    protected final function update(){
         $className = get_called_class();
 
-        if($this->beforeUpdate()){
-            if (static::$_db->update($this) === 0) return 0;
-            unset(self::$_stCache[$className][$this->getId()]);
-            $this->afterUpdate();
-        }else{
-            return null;
+        if (!empty(static::$_tbname) && isset(static::$_dbtype)) {
+            return Som_Model_Mapper_Manager::getMapper(array(
+                "class" => get_called_class(),
+                "tbname" => static::$_tbname,
+                "pkey" => static::primaryKey(),
+            ), $db);
+        } else {
+            throw new Exception("Не верно заданы параметры модели: $className");
         }
     }
 
-    protected function afterUpdate(){ }
-
-
-
-    public static function tableExists($table)
-    {
-        return static::$_db->tableExists();
+    /**
+     * Get Table Name
+     * @return string
+     */
+    public static function getTableName(){
+        return static::$_tbname;
     }
 
-    public static function createTable()
+    /**
+     * Получить настройки DB
+     * @return array
+     */
+    public static function getDbConfig()
     {
-        return static::$_db->createTable(false, static::fieldList());
+        return array(
+            "dbtype" => static::$_dbtype,
+            "tbname" => static::$_tbname,
+            "pkey" => static::primaryKey()
+        );
     }
 
-    public static function fieldExists($field)
-    {
-        // тут можно вернуть информацию из поля columns
-        return static::$_db->fieldExists($field);
+    /**
+     * Get Primary Key
+     * @return int
+     */
+    public function getId() {
+        $pkey = static::primaryKey();
+        if (empty($this->_data[$pkey])) return false;
+
+        return $this->_data[$pkey];
     }
 
-    public static function createField($field)
-    {
-        return static::$_db->createField($field);
+    /**
+     * Returns primary key column name. Defaults to 'id' if none was set.
+     *
+     * @return string
+     */
+    public static function primaryKey(){
+        return isset(static::$_primary_key) ? static::$_primary_key : 'id';
     }
 
-    public static function alterField($old, $new = false)
+    function __toString()
     {
-        return static::$_db->alterField($old, $new);
-    }
-
-    public static function deleteField($field)
-    {
-        return static::$_db->deleteField($field);
+        return $this->getId();
     }
 
     /* =========================== */
