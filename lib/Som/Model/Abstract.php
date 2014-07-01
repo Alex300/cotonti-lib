@@ -112,17 +112,6 @@ abstract class Som_Model_Abstract
 
     // ==== Методы для манипуляции с данными ====
     /**
-     * Возвращает элемент в виде массива
-     *
-     * @return array
-     */
-    function toArray()
-    {
-        $data = $this->_data;
-        return $data;
-    }
-
-    /**
      * @access public
      *
      * @param string $name
@@ -319,6 +308,16 @@ abstract class Som_Model_Abstract
             unset($this->_data[$column]);
     }
 
+    /**
+     * Возвращает элемент в виде массива
+     *
+     * @return array
+     */
+    function toArray()
+    {
+        $data = $this->_data;
+        return $data;
+    }
 
     protected function beforeSetData($data){ return true; }
 
