@@ -473,7 +473,7 @@ abstract class Som_Model_Abstract
         return static::$_db->fetch($conditions, $limit, $offset, $order);
     }
 
-    protected function beforeSave($data){ return true; }
+    protected function beforeSave($data = null){ return true; }
 
     /**
      * Save data
