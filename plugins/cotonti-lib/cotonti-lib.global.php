@@ -17,12 +17,12 @@ defined('COT_CODE') or die('Wrong URL.');
 require_once 'lib/Loader.php';
 Loader::register();
 
-/**
- * user display name
- * @param array|int $user User Data or User ID
- * @return array
- */
 if(!function_exists('cot_user_display_name')){
+    /**
+     * user display name
+     * @param array|int $user User Data or User ID
+     * @return array
+     */
     function cot_user_display_name($user){
 
         if( is_int($user) || ctype_digit($user) ) $user = cot_user_data($user);
@@ -40,13 +40,14 @@ if(!function_exists('cot_user_display_name')){
     }
 }
 
-/**
- * Fetches user entry from DB
- *
- * @param int $id User ID
- * @return array
- */
 if(!function_exists('cot_user_data')){
+    /**
+     * Fetches user entry from DB
+     *
+     * @param int $uid User ID
+     * @param bool $cacheitem
+     * @return array
+     */
     function cot_user_data($uid = 0, $cacheitem = true){
         global $db_users;
 
