@@ -16,5 +16,5 @@ defined('COT_CODE') or die('Wrong URL');
 
 $temp_array['DISPLAY_NAME'] = '';
 if($user_data['user_id'] > 0){
-    $temp_array['DISPLAY_NAME'] = cot_user_display_name($user_data);
+    $temp_array['DISPLAY_NAME'] = htmlspecialchars(cot_user_display_name($user_data));
 }
