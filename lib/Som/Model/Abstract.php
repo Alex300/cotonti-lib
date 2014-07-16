@@ -359,15 +359,24 @@ abstract class Som_Model_Abstract
 
     /**
      * Increment
-     * @param   array      $pair array(array(key,val))
+     * @param  string|array $pair Поля для инкремента 'field2' или  array('field'=> 2, 'field2')
+     *      В данном примере поле 'field2' будет увеличено на 1
      * @param array|string $conditions
-     *
-     * @return mixed
+     * @return bool
      */
     public function inc($pair = array(), $conditions = '') {
         if (!empty($pair)) {
-            foreach ($pair as $v)
-                $this->_data[$v[0]] = $this->_data[$v[0]] + $v[1];
+            if(!is_array($pair)) $pair = array($pair);
+            foreach ($pair as $field => $val){
+                // Если передали просто имя поля, то увеличиваем его на 1
+                if((is_int($field) || ctype_digit($field)) && is_string($val)){
+                    $pair[$val] = 1;
+                    unset($pair[$field]);
+                }
+            }
+            foreach ($pair as $field => $val){
+                $this->_data[$field] = $this->_data[$field] + $val;
+            }
 
             return static::$_db->inc(static::$_tbname, $pair,
                 " {$this->primaryKey()} = {$this->getId()} " .$conditions);
@@ -376,15 +385,25 @@ abstract class Som_Model_Abstract
 
     /**
      * Decrement
-     * @param   array      $pair array(array(key,val))
+     * @param string|array $pair Поля для декремента 'field2' или  array('field'=> 2, 'field2')
+     *      В данном примере поле 'field2' будет уменьшено на 1
      * @param array|string $conditions
      *
      * @return mixed
      */
     public function dec($pair = array(), $conditions = array()) {
         if (!empty($pair)) {
-            foreach ($pair as $v)
-                $this->_data[$v[0]] = $this->_data[$v[0]] - $v[1];
+            if(!is_array($pair)) $pair = array($pair);
+            foreach ($pair as $field => $val){
+                // Если передали просто имя поля, то уменьшаем его на 1
+                if((is_int($field) || ctype_digit($field)) && is_string($val)){
+                    $pair[$val] = 1;
+                    unset($pair[$field]);
+                }
+            }
+            foreach ($pair as $field => $val){
+                $this->_data[$field] = $this->_data[$field] - $val;
+            }
 
             return static::$_db->dec(static::$_tbname, $pair,
                 " {$this->primaryKey()} = {$this->getId()} " .$conditions);

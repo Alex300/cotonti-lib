@@ -579,9 +579,10 @@ abstract class Som_Model_Mapper_Abstract
      * @param $tablename
      * @param array $pair
      * @param string $conditions
+     * @return bool
      */
-    public function inc($tablename, $pair = array(), $conditions = '') {
-        $this->incdec($tablename, $pair, $conditions, true);
+    public function inc($tablename, $pair, $conditions = '') {
+        return $this->incdec($tablename, $pair, $conditions, true);
     }
 
     /**
@@ -589,31 +590,38 @@ abstract class Som_Model_Mapper_Abstract
      * @param $tablename
      * @param array $pair
      * @param string $conditions
+     * @return bool
      */
-    public function dec($tablename, $pair = array(), $conditions = '') {
-        $this->incdec($tablename, $pair, $conditions, false);
+    public function dec($tablename, $pair, $conditions = '') {
+        return $this->incdec($tablename, $pair, $conditions, false);
     }
 
-    protected function incdec($tablename, $pairs = array(), $conditions = '', $inc = true) {
+    /**
+     * @param $tablename
+     * @param array $pairs
+     * @param string $conditions
+     * @param bool $inc
+     * @return bool
+     * @throws Exception
+     */
+    protected function incdec($tablename, $pairs, $conditions = '', $inc = true) {
         if (!empty($pairs)) {
-            $model     = null;
-            $tq        = $this->tableQuote;
-            $id        = null;
             $conditions = empty($conditions) ? '' : 'WHERE ' . $conditions;
             $pairupd   = array();
-            foreach ($pairs as $pair) {
-                $pairupd [] = " $pair[0] = $pair[0] " . ($inc ? '+ ' : '- ') . $pair[1];
+            foreach ($pairs as $field => $val) {
+                $pairupd [] = " $field = $field " . ($inc ? '+ ' : '- ') . $val;
             }
             $upd   = implode(',', $pairupd);
-            $query = "UPDATE {$tq}$tablename{$tq} SET $upd $conditions";
+            $query = "UPDATE ".static::quoteIdentifier($tablename)." SET $upd $conditions";
             $res   = $this->_adapter->exec($query);
             if ($res === false) {
                 $array = $this->_adapter->errorInfo();
                 throw new Exception('SQL Error: ' . $array[2]);
             }
 
-            return 0;
+            return true;
         }
+        return false;
     }
 
     /**
