@@ -252,7 +252,7 @@ abstract class Som_Model_Mapper_Abstract
         }
         while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
             $obj = new $model_name($row);
-            $objects[] = $obj;
+            $objects[$row[$model_name::primaryKey()]] = $obj;
         }
 
         if ($res->closeCursor() === false) {
