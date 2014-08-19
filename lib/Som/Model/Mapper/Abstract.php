@@ -225,7 +225,7 @@ abstract class Som_Model_Mapper_Abstract
         else
             $calssCols = $columns;
 
-        if (!empty($model_name::$fetchJoins)) $joins = $model_name::$fetchJoins;
+        if (!empty($model_name::$fetchJoins)) $addJoins = $model_name::$fetchJoins;
         if (!empty($model_name::$fetchСolumns)) $addColumns = $model_name::$fetchСolumns;
 
         $columns = array();
@@ -234,9 +234,11 @@ abstract class Som_Model_Mapper_Abstract
         }
         if (!empty($addColumns)) $columns = array_merge($columns, $addColumns);
         $columns = implode(', ', $columns);
+
+        list($where, $params, $joins) = $this->parseConditions($conditions);
+        if (!empty($addJoins)) $joins = array_merge($joins, $addJoins);
         $joins = implode("\n", $joins);
 
-        list($where, $params) = $this->parseConditions($conditions);
 
         if (!empty($order)) $order = $this->parseOrder($order);
         $order = ($order) ? "ORDER BY $order" : '';
@@ -704,8 +706,9 @@ abstract class Som_Model_Mapper_Abstract
 
         $where = '';
         $orWhere = '';
+        $joins   = array();
 
-        if(empty($conditions)) return array('', array());
+        if(empty($conditions)) return array('', array(), array());
 
         if (!is_array($conditions)) $conditions = array($conditions);
         if (count($conditions) > 0) {
@@ -739,11 +742,11 @@ abstract class Som_Model_Mapper_Abstract
                         // todo дописать обработку полей
                         if (empty($condition[1])) {
                             // Не передали поле, ищем первое попавшиеся
-                            $fld = $class::_getField($condition[0]);
+                            $fld = $class::getField($condition[0]);
                             // todo exception
                             if (empty($fld)) throw new Exception("В моделе '{$class}' нет связи с '" . get_class($condition[0]) . "'");
                         } else {
-                            $fld = $class::_getField($condition[1]);
+                            $fld = $class::getField($condition[1]);
                             if (empty($fld)) {
                                 throw new Exception("В моделе '{$class}' поле '{$condition[1]}' не найдено");
                             }
@@ -799,7 +802,7 @@ abstract class Som_Model_Mapper_Abstract
             $where = 'WHERE (' . implode(') AND (', $where) . ')';
             if (count($orWhere) > 0) $where .= ' OR (' . implode(') OR (', $orWhere) . ")";
         }
-        return array($where, $params);
+        return array($where, $params, $joins);
     }
 
     /**
