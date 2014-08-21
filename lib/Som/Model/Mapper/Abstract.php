@@ -270,16 +270,26 @@ abstract class Som_Model_Mapper_Abstract
      * @param string $table
      * @param $conditions
      *
+     * @throws Exception
      * @return int
      */
     public final function getCount($table = '', $conditions)
     {
         $tq = $this->tableQuote;
-        if (empty($table)) $table = $this->_dbinfo['tbname'];
+        if (empty($table)){
+            $table = $this->_dbinfo['tbname'];
+            if(!empty($this->_dbinfo['class'])){
+                /** @var Som_Model_Abstract $model_name */
+                $model_name = $this->_dbinfo['class'];
+                if (!empty($model_name::$fetchJoins)) $addJoins = $model_name::$fetchJoins;
+            }
+        }
 
-        list($where, $params) = $this->parseConditions($conditions);
+        list($where, $params, $joins) = $this->parseConditions($conditions);
+        if (!empty($addJoins)) $joins = array_merge($joins, $addJoins);
+        $joins = implode("\n", $joins);
 
-        $sql = "SELECT COUNT(*) FROM {$tq}$table{$tq}\n $where\n";
+        $sql = "SELECT COUNT(*) FROM {$tq}$table{$tq}\n $joins\n $where\n";
         $res = $this->query($sql, $params)->fetchColumn();
         if ($res === false) {
             $array = $this->_adapter->errorInfo();
