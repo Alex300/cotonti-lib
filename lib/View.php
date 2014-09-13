@@ -83,7 +83,7 @@ class View{
      * @param mixed $name Variable name or array of values
      * @param mixed $val Tag value if $name is not an array
      * @param string $prefix An optional prefix for variable keys
-     * @return XTemplate $this object for call chaining
+     * @return View $this object for call chaining
      */
     public function assign($name, $val = NULL, $prefix = ''){
         if (is_array($name)){
@@ -215,7 +215,15 @@ class View{
         return false;
     }
 
-
+    /**
+     * @param $viewFile имя файла шаблона. Если не указано расширение или оно не входит в $_extensions, будет использовано
+     *              '.php'
+     * @param string $type
+     * @param null $admin
+     * @param bool $return Вернуть как строку?
+     * @return string
+     * @throws Exception
+     */
     public function render($viewFile, $type = 'module', $admin = null, $return = true) {
 
         $scriptFile = $this->scriptFile($viewFile, $type, $admin);
