@@ -110,6 +110,10 @@ class View{
             $dir = rtrim($dir, '\\');
             $dir .= DIRECTORY_SEPARATOR;
 
+            foreach($this->_path as $key => $val){
+                if($this->_path[$key] == $dir) unset($this->_path[$key]);
+            }
+
             if($prepend){
                 // add to the top of the stack.
                 array_unshift($this->_path, $dir);
@@ -122,10 +126,16 @@ class View{
     }
 
     /**
-     * Return Script Path
+     * Return Template Script Path
      *
      * @param $base имя файла шаблона. Если не указано расширение или оно не входит в $_extensions, будет использовано
      *              '.php'
+     *              The default search order is:
+     *                1) Current theme folder (plugins/ subdir for plugins, admin/ subdir for admin)
+     *                2) Default theme folder (if current is not default)
+     *                3) tpl subdir in module/plugin folder (fallback template)
+     * @param string $type Extension type: 'plug', 'module' or 'core'
+     * @param null $admin  Use admin theme file if present. Tries to determine from viewFile string by default.
      * @param string $type
      * @param null $admin
      * @throws Exception
@@ -133,6 +143,7 @@ class View{
      * @return string
      */
     public function scriptFile($base, $type = 'module', $admin = null) {
+        global $cfg, $usr;
 
         // Get base name parts
         if (is_string($base) && mb_strpos($base, '.') !== false)
@@ -153,44 +164,31 @@ class View{
         if ($type == 'plug')
         {
             // Plugin template paths
-            if($admin){
-                if(!empty(cot::$cfg['admintheme'])){
-                    $this->_path[] = cot::$cfg['themes_dir']."/admin/".cot::$cfg['admintheme']."/plugins/";
-                }
-                $this->_path[] = cot::$cfg['themes_dir'].DIRECTORY_SEPARATOR.cot::$usr['theme']."/admin/plugins/";
-            }
-
-            $this->_path[] = cot::$cfg['themes_dir'].DIRECTORY_SEPARATOR.cot::$usr['theme'].DIRECTORY_SEPARATOR."plugins"
-                .DIRECTORY_SEPARATOR;
-            $this->_path[] = cot::$cfg['themes_dir'].DIRECTORY_SEPARATOR.cot::$usr['theme'].DIRECTORY_SEPARATOR."plugins"
-                .DIRECTORY_SEPARATOR.$base[0].DIRECTORY_SEPARATOR;
-            $this->_path[] = cot::$cfg['plugins_dir'].DIRECTORY_SEPARATOR.$base[0].DIRECTORY_SEPARATOR."tpl".DIRECTORY_SEPARATOR;
+            $admin && !empty($cfg['admintheme']) && $scan_dirs[] = "{$cfg['themes_dir']}/admin/{$cfg['admintheme']}/plugins/";
+            $admin && $scan_dirs[] = "{$cfg['themes_dir']}/{$usr['theme']}/admin/plugins/";
+            $scan_dirs[] = "{$cfg['themes_dir']}/{$usr['theme']}/plugins/";
+            $scan_dirs[] = "{$cfg['themes_dir']}/{$usr['theme']}/plugins/{$base[0]}/";
+            $scan_dirs[] = "{$cfg['plugins_dir']}/{$base[0]}/tpl/";
         }
         elseif ($type == 'core' && in_array($base[0], array('admin', 'header', 'footer', 'message')))
         {
             // Built-in core modules
-            if(!empty(cot::$cfg['admintheme'])){
-                $this->_path[] = cot::$cfg['themes_dir']."/admin/".cot::$cfg['admintheme'].DIRECTORY_SEPARATOR;
-            }
-            $this->_path[] = cot::$cfg['themes_dir'].DIRECTORY_SEPARATOR.cot::$usr['theme']."/admin/";
-            $this->_path[] = cot::$cfg['system_dir'].DIRECTORY_SEPARATOR."admin/tpl/";
+            !empty($cfg['admintheme']) && $scan_dirs[] = "{$cfg['themes_dir']}/admin/{$cfg['admintheme']}/";
+            $scan_dirs[] = "{$cfg['themes_dir']}/{$usr['theme']}/admin/";
+            $scan_dirs[] = "{$cfg['system_dir']}/admin/tpl/";
         }
         else
         {
             // Module template paths
-            if($admin){
-                if(!empty(cot::$cfg['admintheme'])){
-                    $this->_path[] = cot::$cfg['themes_dir']."/admin/".cot::$cfg['admintheme']."/modules/";
-                }
-                $this->_path[] = cot::$cfg['themes_dir'].DIRECTORY_SEPARATOR.cot::$usr['theme']."/admin/modules/";
-            }
-            $this->_path[] = cot::$cfg['themes_dir'].DIRECTORY_SEPARATOR.cot::$usr['theme'].DIRECTORY_SEPARATOR;
-            $this->_path[] = cot::$cfg['themes_dir'].DIRECTORY_SEPARATOR.cot::$usr['theme'].DIRECTORY_SEPARATOR."modules"
-                .DIRECTORY_SEPARATOR;
-            $this->_path[] = cot::$cfg['themes_dir'].DIRECTORY_SEPARATOR.cot::$usr['theme'].DIRECTORY_SEPARATOR."modules"
-                .DIRECTORY_SEPARATOR.$base[0].DIRECTORY_SEPARATOR;
-            $this->_path[] = cot::$cfg['modules_dir'].DIRECTORY_SEPARATOR.$base[0].DIRECTORY_SEPARATOR."tpl".DIRECTORY_SEPARATOR;
+            $admin && !empty($cfg['admintheme']) && $scan_dirs[] = "{$cfg['themes_dir']}/admin/{$cfg['admintheme']}/modules/";
+            $admin && $scan_dirs[] = "{$cfg['themes_dir']}/{$usr['theme']}/admin/modules/";
+            $scan_dirs[] = "{$cfg['themes_dir']}/{$usr['theme']}/";
+            $scan_dirs[] = "{$cfg['themes_dir']}/{$usr['theme']}/modules/";
+            $scan_dirs[] = "{$cfg['themes_dir']}/{$usr['theme']}/modules/{$base[0]}/";
+            $scan_dirs[] = "{$cfg['modules_dir']}/{$base[0]}/tpl/";
         }
+
+        if(!empty($scan_dirs)) $this->addScriptPath($scan_dirs, false);
 
         // Build template file name from base parts glued with dots
         $base_depth = count($base);
@@ -218,8 +216,12 @@ class View{
     /**
      * @param $viewFile имя файла шаблона. Если не указано расширение или оно не входит в $_extensions, будет использовано
      *              '.php'
-     * @param string $type
-     * @param null $admin
+     *              The default search order is:
+     *                1) Current theme folder (plugins/ subdir for plugins, admin/ subdir for admin)
+     *                2) Default theme folder (if current is not default)
+     *                3) tpl subdir in module/plugin folder (fallback template)
+     * @param string $type Extension type: 'plug', 'module' or 'core'
+     * @param null $admin  Use admin theme file if present. Tries to determine from viewFile string by default.
      * @param bool $return Вернуть как строку?
      * @return string
      * @throws Exception
