@@ -5,7 +5,7 @@ Hooks=global
 [END_COT_EXT]
 ==================== */
 /**
- * Region City plugin for Cotonti
+ * Cotonti Lib plugin for Cotonti
  *
  * @package Cotonti Lib
  * @author Alex
@@ -17,13 +17,13 @@ defined('COT_CODE') or die('Wrong URL.');
 require_once 'lib/Loader.php';
 Loader::register();
 
-if(!function_exists('cot_user_display_name')){
+if(!function_exists('cot_user_full_name')){
     /**
      * user display name
      * @param array|int $user User Data or User ID
      * @return array
      */
-    function cot_user_display_name($user){
+    function cot_user_full_name($user){
 
         if( is_int($user) || ctype_digit($user) ) $user = cot_user_data($user);
         if(empty($user)) return '';

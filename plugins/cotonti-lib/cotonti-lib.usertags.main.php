@@ -2,11 +2,11 @@
 /* ====================
 [BEGIN_COT_EXT]
 Hooks=usertags.main
-Tags=users.tpl:{USERS_DETAILS_DISPLAY_NAME}
+Tags=users.tpl:{USERS_DETAILS_FULL_NAME}
 [END_COT_EXT]
 ==================== */
 /**
- * Region City plugin for Cotonti
+ * Cotonti Lib plugin for Cotonti
  *
  * @package Cotonti Lib
  * @author Alex
@@ -14,7 +14,7 @@ Tags=users.tpl:{USERS_DETAILS_DISPLAY_NAME}
  */
 defined('COT_CODE') or die('Wrong URL');
 
-$temp_array['DISPLAY_NAME'] = '';
+$temp_array['FULL_NAME'] = '';
 if($user_data['user_id'] > 0){
-    $temp_array['DISPLAY_NAME'] = htmlspecialchars(cot_user_display_name($user_data));
+    $temp_array['FULL_NAME'] = htmlspecialchars(cot_user_full_name($user_data));
 }
