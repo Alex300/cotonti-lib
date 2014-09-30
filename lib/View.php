@@ -214,6 +214,37 @@ class View{
     }
 
     /**
+     * Renders different messages on page
+     *  wrapper for cot_display_messages()
+     *
+     * @param string $tpl
+     * @throws Exception
+     * @return string
+     * @see cot_display_messages()
+     */
+    public function displayMessages($tpl = ''){
+        if($tpl == ''){
+            $tpl = cot::$cfg['themes_dir'].DIRECTORY_SEPARATOR.cot::$usr['theme'].DIRECTORY_SEPARATOR.'warnings.tpl';
+            if(!file_exists($tpl)){
+                $tpl = cot::$cfg['themes_dir'].DIRECTORY_SEPARATOR.cot::$cfg['defaulttheme'].DIRECTORY_SEPARATOR.'warnings.tpl';
+            }
+        }
+        if(!file_exists($tpl)){
+            throw new Exception('Messages/Warning template not found');
+        }
+
+        $raw_tpl = file_get_contents($tpl);
+
+        $t = new XTemplate();
+        $t->compile('<!-- BEGIN: MAIN-->'.$raw_tpl.'<!-- END: MAIN-->');
+
+        cot_display_messages($t);
+
+        $t->parse();
+        $t->out();
+    }
+
+    /**
      * @param $viewFile имя файла шаблона. Если не указано расширение или оно не входит в $_extensions, будет использовано
      *              '.php'
      *              The default search order is:
