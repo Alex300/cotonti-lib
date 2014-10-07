@@ -17,6 +17,12 @@ class View{
 
     protected $themeDir = '';
 
+    /**
+     * @var bool вызывался ли метод вывода сообщений displayMessages() для текущего шаблона
+     * @see View::displayMessages()
+     */
+    protected $messagesDisplayed = false;
+
     function __construct() {
         $this->themeDir = cot::$cfg['themes_dir'].DIRECTORY_SEPARATOR.cot::$usr['theme'].DIRECTORY_SEPARATOR;
     }
@@ -235,10 +241,17 @@ class View{
 
         $raw_tpl = file_get_contents($tpl);
 
+        // Закешируем сообщения на период выполнения
+        $currentMessages = cot_get_messages('');
+
         $t = new XTemplate();
         $t->compile('<!-- BEGIN: MAIN-->'.$raw_tpl.'<!-- END: MAIN-->');
 
         cot_display_messages($t);
+
+        // "Пробросим" сообщения об ошибках назад, чтобы скрипт вида мог подсвечивать элементы форм с ошибками
+        $_SESSION['cot_messages'][cot::$sys['site_id']] = $currentMessages;
+        $this->messagesDisplayed = true;
 
         $t->parse();
         $t->out();
@@ -278,9 +291,15 @@ class View{
             ob_start();
             ob_implicit_flush(false);
             require($scriptFile);
+
+            if($this->messagesDisplayed) cot_clear_messages();
+
             return ob_get_clean();
-        } else
+        } else {
             require($scriptFile);
+        }
+
+        if($this->messagesDisplayed) cot_clear_messages();
     }
 
 }
