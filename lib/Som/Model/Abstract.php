@@ -173,13 +173,27 @@ abstract class Som_Model_Abstract
                 }
             }
         }
+
+        // input filter
         if (in_array($name, static::getColumns())) {
+            // @todo общие типы данных, независимые от типа БД
             switch ($this->fields[$name]['type']) {
+                case 'tinyint':
+                case 'smallint':
+                case 'mediumint':
                 case 'int':
                 case 'bigint':
                     if(!( is_int($val) || ctype_digit($val) )) $val = null;
-//
                     break;
+
+                case 'float':
+                case 'double':
+                case 'decimal':
+                case 'numeric':
+                    if(mb_strpos($val, ',') !== false) $val = str_replace(',', '.', $val);
+                    $val = cot_import($val, 'DIRECT', 'NUM');
+                    break;
+
                 case 'bool':
                     if(!is_null($val)) $val = (bool)$val;
                     break;
