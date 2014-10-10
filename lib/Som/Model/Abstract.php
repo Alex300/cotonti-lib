@@ -354,7 +354,7 @@ abstract class Som_Model_Abstract
                 throw new  Exception("Data must be an Array or instance of $class Class");
             }
             foreach ($data as $key => $value) {
-                if ($safe && isset ($this->fields[$key]['safe']) && $this->fields[$key]['safe']){
+                if ($safe && isset($this->fields[$key]['safe']) && $this->fields[$key]['safe']){
                     if(!cot::$usr['isadmin'] && cot::$env['ext'] != 'admin'){
                         throw new Exception("Trying to write value «{$value}» to protected field «{$key}» of model «{$class}»");
                     }

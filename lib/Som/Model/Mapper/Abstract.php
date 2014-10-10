@@ -454,7 +454,11 @@ abstract class Som_Model_Mapper_Abstract
             $table_name = $this->_dbinfo['tbname'];
             $pkey = $this->_dbinfo['pkey'];
 
-            if (empty($data)) $data = $model->toArray();
+            if (empty($data)) {
+                // When save models, by default we must save null values too
+                if(empty($condition) && empty($parameters)) $update_null = true;
+                $data = $model->toArray();
+            }
             $id = $data[$pkey];
             unset($data[$data[$pkey]]);
             $condition = "{$pkey}={$id}";
