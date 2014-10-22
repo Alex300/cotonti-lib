@@ -512,7 +512,7 @@ abstract class Som_Model_Abstract
      * Save data
      *
      * @param Som_Model_Mapper_Abstract|array|null $data
-     *
+
      * @return int id of saved record
      */
     public function save($data = null)
@@ -524,7 +524,7 @@ abstract class Som_Model_Abstract
 
             if (!$this->validate()) return false;
 
-            if ($this->getId() === false) {
+            if ($this->getId() === null) {
 
                 // Добавить новый
                 $id = $this->insert();
@@ -1019,7 +1019,7 @@ abstract class Som_Model_Abstract
      */
     public function getId() {
         $pkey = static::primaryKey();
-        if (empty($this->_data[$pkey])) return false;
+        if (empty($this->_data[$pkey])) return null;
 
         return $this->_data[$pkey];
     }
