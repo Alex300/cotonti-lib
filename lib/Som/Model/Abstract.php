@@ -145,7 +145,7 @@ abstract class Som_Model_Abstract
                     throw new Exception("Тип переданного значения не соответствует пипу поля. Должно быть: $className");
                     exit();
                 }
-            } else {
+            } elseif (in_array($name, static::getColumns())) {
                 throw new Exception("Связь для поля '{$name}' не найдена");
                 exit();
             }
