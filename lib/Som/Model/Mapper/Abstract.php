@@ -226,7 +226,7 @@ abstract class Som_Model_Mapper_Abstract
             $calssCols = $columns;
 
         if (!empty($model_name::$fetchJoins)) $addJoins = $model_name::$fetchJoins;
-        if (!empty($model_name::$fetchСolumns)) $addColumns = $model_name::$fetchСolumns;
+        if (!empty($model_name::$fetchColumns)) $addColumns = $model_name::$fetchColumns;
 
         $columns = array();
         foreach ($calssCols as $col) {
