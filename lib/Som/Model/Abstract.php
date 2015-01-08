@@ -1,16 +1,20 @@
 <?php
 
 /**
+ * ORM System
+ * SOM - Simple Object Manipulation
  *
- * @author  Mankov
- * @author: Kalnov Alexey <kalnov_alexey@yandex.ru> http://portal30.ru
+ * @author Gert Hengeveld (ORM from cot-factory)
+ * @author Mankov
+ * @author Kalnov Alexey <kalnov_alexey@yandex.ru> http://portal30.ru
  * @version 1.2
  *
  * @static string $_dbtype
  * @static string $_tbname
  * @static Som_Model_Mapper_Abstract $_db;
- * @static  string $_primary_key
- * @todo    Модели наблюдатели. При перед удалением модели другие модели оповещаются об этом и могут запретить удаление
+ * @static string $_primary_key
+ *
+ * @todo    Hooks for before/after insert, update, delete methods
  */
 abstract class Som_Model_Abstract
 {
