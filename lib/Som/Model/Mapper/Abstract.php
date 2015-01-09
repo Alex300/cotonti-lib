@@ -30,31 +30,28 @@ abstract class Som_Model_Mapper_Abstract
 
     /**
      * @param $dbinfo
-     * @param string $db
+     * @param string $dbc
      */
     function __construct($dbinfo, $dbc = 'db'){
-        global $cfg, $db;
 
         $this->_dbinfo = $dbinfo;
 
         if (empty(self::$connections[$dbc])) {
 
-            // Устанавливаем соединение
+            // Connect to DB
             if($dbc == 'db'){
-                // Соединение Cotonti по-умолчанию
-                self::$connections[$dbc] = $db;
+                // Default cotonti connection
+                self::$connections[$dbc] = cot::$db;
             }else{
                 // Альтернативное соединение из конфига
-//                $dbc_port = empty(Kernel::$config[$dbc]['params']['port']) ? '' : ';port=' . Kernel::$config[$dbc]['params']['port'];
-//                $dsn = Kernel::$config[$dbc]['adapter'] . ':host=' . Kernel::$config[$dbc]['params']['host'] . $dbc_port .
-//                    ';dbname=' . Kernel::$config[$dbc]['params']['dbname'];
-//                static::$connections[$dbc] = new PDO($dsn, Kernel::$config[$dbc]['params']['username'],
-//                    Kernel::$config[$dbc]['params']['password']);
+                $dbc_port = empty(cot::$cfg[$dbc]['port']) ? '' : ';port=' . cot::$cfg[$dbc]['port'];
+                $dsn = cot::$cfg[$dbc]['adapter'] . ':host=' . cot::$cfg[$dbc]['host'] . $dbc_port .
+                    ';dbname=' . cot::$cfg[$dbc]['dbname'];
+                static::$connections[$dbc] = new PDO($dsn, cot::$cfg[$dbc]['username'], cot::$cfg[$dbc]['password']);
             }
         }
         $this->_adapter = self::$connections[$dbc];
     }
-
 
     /**
      * Получить существующие таблиуы

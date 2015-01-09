@@ -66,7 +66,15 @@ abstract class Som_Model_Abstract
      * Модель не проверяет наличие таблицы и всех полей, а наивно доверяет данным из метода fieldList()
      */
     public static function __init($db = 'db'){
-        static::$_dbtype = 'mysql';
+        if($db == 'db') {
+            static::$_dbtype = 'mysql';
+        } else {
+            if(empty(cot::$cfg[$db]) || empty(cot::$cfg[$db]['adapter'])) {
+                throw new Exception('Connection config not found in $cfg['.$db.']');
+            }
+
+            static::$_dbtype = cot::$cfg[$db]['adapter'];
+        }
         static::$_db = static::getMapper($db);
     }
 
@@ -965,32 +973,27 @@ abstract class Som_Model_Abstract
 
     /**
      * Провека на возможность удаления
-     * Этот метод полезно перелпределять для создания проверок спецефичных для конкретной модели
+     * Этот метод полезно переопределять для создания проверок спецефичных для конкретной модели
      * @return bool
-     * @todo получить наблюдателей и спросить разрешения на удаление объекта!
      */
-    public function validateDelete()
-    {
-        return true;
-    }
+    public function validateDelete() { return true; }
     // ==== /Методы для Валидации ====
 
     /**
-     * Фабрика мапперов
+     * Mapper Factory
      * @param string $db connection name
      * @throws Exception
      * @return Som_Model_Mapper_Abstract
      */
-    public static function getMapper($db = 'db')
-    {
+    public static function getMapper($db = 'db') {
         $className = get_called_class();
 
         if (!empty(static::$_tbname) && isset(static::$_dbtype)) {
-            return Som_Model_Mapper_Manager::getMapper(array(
-                "class" => get_called_class(),
-                "tbname" => static::$_tbname,
-                "pkey" => static::primaryKey(),
-            ), $db);
+            return Som_Model_Mapper_Manager::getMapper($db, array(
+                        "class" => get_called_class(),
+                        "tbname" => static::$_tbname,
+                        "pkey" => static::primaryKey(),
+                    ));
         } else {
             throw new Exception("Не верно заданы параметры модели: $className");
         }
