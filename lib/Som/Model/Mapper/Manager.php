@@ -11,7 +11,8 @@ class Som_Model_Mapper_Manager {
      * @param string $db
      * @param array $dbinfo
      *
-     * Db connection example
+     * Db connection config example:
+     *
      * cot::$cfg['db_avtochuvasiya'] = array(
      *      'adapter' => 'mysql',   // 'pgsql' or 'mongo'
      *      'host' => '127.0.0.1',
