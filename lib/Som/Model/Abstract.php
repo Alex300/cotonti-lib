@@ -711,25 +711,36 @@ abstract class Som_Model_Abstract
 
     /**
      * Получить все поля из БД
+     * Метод очень затратный по рессурсам. Кеширование на период выполнения необходимо
      *
-     * @param bool $real получить поля напрямую из таблицы
-     * @return array|null
+     * @param bool $real  получить поля напрямую из таблицы
+     * @param bool $cache Использовать кеш периода выполнения
+     *
+     * @return null|array
      */
-    public static function getColumns($real = false) {
+    public static function getColumns($real = false, $cache = true) {
 
-        if($real) return static::$_db->getFields(static::$_tbname);
+        if ($real) return static::$_db->getFields(static::$_tbname);
 
-        $cols = array();
+        $class = get_called_class();
+
+        static $cols   = array();
+
+        if($cache && !empty($cols[$class]))  return $cols[$class];
+
         $fields = array_merge(static::fieldList(), static::$_extraFields);
         // Не включаем связи ко многим и, также, указывающие на другое поле
+        $cols[$class] = array();
         foreach ($fields as $name => $field) {
             if (!isset($field['link']) ||
-                (in_array($field['link']['relation'], array('toone', 'toonenull')) && !isset($field['link']['localKey'])) ){
+                (in_array($field['link']['relation'], array('toone', 'toonenull')) && !isset($field['link']['localKey'])) ) {
 
-                $cols[] = $name;
+                $cols[$class][] = $name;
             }
         }
-        return $cols;
+
+
+        return $cols[$class];
     }
 
     /**
