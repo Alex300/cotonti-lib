@@ -48,6 +48,7 @@ abstract class Som_Model_Abstract
      * @var array Список полей, описанный в моделе и/или получаемый из полей БД. С типами данных.
      */
     protected $fields = array();
+    protected static $fieldsCache = array();
 
     /**
      * Model extrafields. Поля присутсвубщие в таблице, но не описанные в fieldList().
@@ -92,9 +93,14 @@ abstract class Som_Model_Abstract
     {
         $pkey = static::primaryKey();
 
+        $className = get_called_class();
+
         // Инициализация полей
-        $this->fields = static::fieldList();
-        $this->fields = array_merge($this->fields, static::$_extraFields);
+        if(!empty(self::$fieldsCache[$className])) {
+            $this->fields = self::$fieldsCache[$className];
+        } else {
+            $this->fields = self::$fieldsCache[$className] = array_merge(static::fieldList(), static::$_extraFields);
+        }
         foreach ($this->fields as $name => $field) {
             if (!isset($field['link']) ||
                 (in_array($field['link']['relation'], array('toone', 'toonenull')) && !isset($field['link']['localKey'])) ){
@@ -722,25 +728,28 @@ abstract class Som_Model_Abstract
 
         if ($real) return static::$_db->getFields(static::$_tbname);
 
-        $class = get_called_class();
+        $className = get_called_class();
 
         static $cols   = array();
 
-        if($cache && !empty($cols[$class]))  return $cols[$class];
+        if($cache && !empty($cols[$className]))  return $cols[$className];
 
-        $fields = array_merge(static::fieldList(), static::$_extraFields);
+        if($cache && !empty(self::$fieldsCache[$className])) {
+            $fields = self::$fieldsCache[$className];
+        } else {
+            $fields = self::$fieldsCache[$className] = array_merge(static::fieldList(), static::$_extraFields);
+        }
         // Не включаем связи ко многим и, также, указывающие на другое поле
-        $cols[$class] = array();
+        $cols[$className] = array();
         foreach ($fields as $name => $field) {
             if (!isset($field['link']) ||
-                (in_array($field['link']['relation'], array('toone', 'toonenull')) && !isset($field['link']['localKey'])) ) {
-
-                $cols[$class][] = $name;
+                (in_array($field['link']['relation'], array('toone', 'toonenull')) && !isset($field['link']['localKey']))
+            ) {
+                $cols[$className][] = $name;
             }
         }
 
-
-        return $cols[$class];
+        return $cols[$className];
     }
 
     /**
@@ -831,6 +840,9 @@ abstract class Som_Model_Abstract
 
         $params['donor'] = $donor;
         static::$_extraFields[$params['name']] = $params;
+
+        $className = get_called_class();
+        self::$fieldsCache[$className] = array();
     }
 
     // ==== /Методы для работы с полями ====
