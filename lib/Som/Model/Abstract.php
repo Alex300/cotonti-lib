@@ -409,9 +409,9 @@ abstract class Som_Model_Abstract
             foreach ($pair as $field => $val){
                 $this->_data[$field] = $this->_data[$field] + $val;
             }
-
+            $pkey = static::primaryKey();
             return static::$_db->inc(static::$_tbname, $pair,
-                " {$this->primaryKey()} = {$this->getId()} " .$conditions);
+                " {$pkey} = {$this->getId()} " .$conditions);
         }
     }
 
@@ -436,9 +436,9 @@ abstract class Som_Model_Abstract
             foreach ($pair as $field => $val){
                 $this->_data[$field] = $this->_data[$field] - $val;
             }
-
+            $pkey = static::primaryKey();
             return static::$_db->dec(static::$_tbname, $pair,
-                " {$this->primaryKey()} = {$this->getId()} " .$conditions);
+                " {$pkey} = {$this->getId()} " .$conditions);
         }
     }
     // ==== /Методы для манипуляции с данными ====
