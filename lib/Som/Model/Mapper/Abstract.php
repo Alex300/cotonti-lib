@@ -102,7 +102,6 @@ abstract class Som_Model_Mapper_Abstract
      * Изменить существющее поле
      * @param array $old
      * @param array|bool $new
-     * @internal param $field_name
      * @return bool
      */
     public abstract function alterField($old, $new = false);

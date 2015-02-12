@@ -758,7 +758,15 @@ abstract class Som_Model_Abstract
      * @return mixed
      */
     public function rawValue($column){
-        if(isset($this->_data[$column])) return $this->_data[$column];
+        if($this->fields[$column]['type'] == 'link' && in_array($this->fields[$column]['link']['relation'],
+                array('tomany', 'tomanynull'))) {
+            if(isset($this->fields[$column]['data'])) return $this->fields[$column]['data'];
+            return null;
+
+        } elseif (isset($this->_data[$column])) {
+            return $this->_data[$column];
+        }
+
         return null;
     }
 
