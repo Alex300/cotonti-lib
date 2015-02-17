@@ -29,6 +29,27 @@ abstract class Som_Model_Mapper_Abstract
     protected $_adapter = null;
 
     /**
+     * ExtraFields types to SQL types
+     * @var array
+     */
+    public static $extraTypesMap = array(
+        'select'        => 'varchar',
+		'radio'         => 'varchar',
+		'range'         => 'varchar',
+		'file'          => 'varchar',
+		'input'         => 'varchar',
+		'inputint'      => 'int',
+		'currency'      => 'numeric',
+		'double'        => 'double',
+		'checklistbox'  => 'text',
+		'textarea'      => 'text',
+		'checkbox'      => 'tinyint',
+		'datetime'      => 'int',
+		'country'       => 'char',
+		'filesize'      => 'int'
+    );
+
+    /**
      * @param $dbinfo
      * @param string $dbc
      */
@@ -436,8 +457,8 @@ abstract class Som_Model_Mapper_Abstract
      * @param string $condition Body of SQL WHERE clause
      * @param array $parameters Array of statement input parameters, see http://www.php.net/manual/en/pdostatement.execute.php
      * @param bool $update_null Nullify cells which have null values in the array. By default they are skipped
-     * @internal param string $table_name Table name
      * @return int The number of affected records or FALSE on error
+     * @throws Exception
      */
     public function update($table_name, $data = false, $condition = '', $parameters = array(), $update_null = false)
     {

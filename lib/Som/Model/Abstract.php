@@ -67,6 +67,8 @@ abstract class Som_Model_Abstract
      * Модель не проверяет наличие таблицы и всех полей, а наивно доверяет данным из метода fieldList()
      */
     public static function __init($db = 'db'){
+        global $cot_extrafields;
+
         if($db == 'db') {
             static::$_dbtype = 'mysql';
         } else {
@@ -76,7 +78,28 @@ abstract class Som_Model_Abstract
 
             static::$_dbtype = cot::$cfg[$db]['adapter'];
         }
-        static::$_db = static::getMapper($db);
+        static::$_db = $dbAdapter = static::getMapper($db);
+
+        // load Extrafields
+        if(!empty($cot_extrafields[static::$_tbname])) {
+            // Не очень хорошее решение, но в Cotonti имена полей хранятся без префиска.
+            $column_prefix = substr(static::$_primary_key, 0, strpos(static::$_primary_key, "_"));
+            $column_prefix = (!empty($column_prefix)) ? $column_prefix.'_' : '';
+
+            foreach($cot_extrafields[static::$_tbname] as $key => $field) {
+                if(!array_key_exists($field['field_type'], $dbAdapter::$extraTypesMap)) continue;
+                $data = array(
+                    'name'      => $column_prefix.$field['field_name'],
+                    'type'      => $dbAdapter::$extraTypesMap[$field['field_type']],
+//                    'length'    => '64',
+                    'description' => $field['field_description'],
+                    'nullable'  => ($field['field_required'] == 1) ? false : true,
+                    'default'   => $field['field_default'],
+                );
+                $className = get_called_class();
+                $className::addFieldToAll($data, $className);
+            }
+        }
     }
 
 
