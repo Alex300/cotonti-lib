@@ -634,7 +634,7 @@ abstract class Som_Model_Abstract
      *
      */
     public static function updateRows($data, $condition = ''){
-        if (empty($set)) {
+        if (empty($data)) {
             throw new Exception('$data is empty');
         }
         return static::$_db->update(static::$_tbname, $data, $condition);
