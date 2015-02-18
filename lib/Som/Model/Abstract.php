@@ -624,6 +624,22 @@ abstract class Som_Model_Abstract
 
     protected function afterUpdate(){ }
 
+    /**
+     * Обновить набор элементов, соотвествующих условию
+     *
+     * @param array $data
+     * @param mixed $condition
+     * @return int
+     * @throws Exception
+     *
+     */
+    public static function updateRows($data, $condition = ''){
+        if (empty($set)) {
+            throw new Exception('$data is empty');
+        }
+        return static::$_db->update(static::$_tbname, $data, $condition);
+    }
+
     protected function beforeDelete(){ return true; }
 
     /**

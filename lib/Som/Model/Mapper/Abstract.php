@@ -499,11 +499,18 @@ abstract class Som_Model_Mapper_Abstract
         $upd = '';
         if (!is_array($parameters)) $parameters = array($parameters);
 
-        $condition = empty($condition) ? '' : 'WHERE ' . $condition;
+        if(!is_object($table_name) && is_array($condition) && !empty($condition)){
+            $class = $this->_dbinfo['class'];
+            $class = new $class();
+            list($condition, $parameters) = $this->parseConditions($condition);
+            unset($class);
+        } else {
+            $condition = empty($condition) ? '' : 'WHERE ' . $condition;
+        }
+
         foreach ($data as $key => $val) {
-            if (is_null($val) && !$update_null) {
-                continue;
-            }
+            if (is_null($val) && !$update_null) continue;
+
             $upd .= "{$tq}$key{$tq}=";
             if (is_null($val)) {
                 $upd .= 'NULL,';
@@ -541,10 +548,7 @@ abstract class Som_Model_Mapper_Abstract
                     $array = $this->_adapter->errorInfo();
                     throw new Exception('SQL Error: ' . $array[2]);
                 }
-                if (empty($res)) {
-                    // Ничего не обновили, видимо указаны уиды, пробуем вставить
-                    return 0;
-                }
+                if (empty($res))  return 0;
             }
 
             return $res;
@@ -923,6 +927,7 @@ abstract class Som_Model_Mapper_Abstract
      *
      * @param PDOStatement $statement PDO statement
      * @param array $parameters Array of parameters, numeric or associative
+     * @throws Exception
      */
     private function _bindParams($statement, $parameters)
     {
