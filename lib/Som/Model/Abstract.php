@@ -64,7 +64,9 @@ abstract class Som_Model_Abstract
 
     /**
      * Static constructor
+     * @param string $db Data base connection config name
      * Модель не проверяет наличие таблицы и всех полей, а наивно доверяет данным из метода fieldList()
+     * @throws Exception
      */
     public static function __init($db = 'db'){
         global $cot_extrafields;
