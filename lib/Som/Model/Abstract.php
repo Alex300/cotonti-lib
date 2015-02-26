@@ -55,7 +55,7 @@ abstract class Som_Model_Abstract
      * Они могут быть созданы другими модулями
      * @var array
      */
-    public static $_extraFields = array();
+    protected static $_extraFields = array();
 
     protected $_e;
 
