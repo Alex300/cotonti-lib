@@ -80,6 +80,9 @@ abstract class Som_Model_Abstract
         }
         static::$_db = $dbAdapter = static::getMapper($db);
 
+        $className = get_called_class();
+        self::$_extraFields[$className] = array();
+
         // load Extrafields
         if(!empty($cot_extrafields[static::$_tbname])) {
             // Не очень хорошее решение, но в Cotonti имена полей хранятся без префиска.
@@ -96,7 +99,7 @@ abstract class Som_Model_Abstract
                     'nullable'  => ($field['field_required'] == 1) ? false : true,
                     'default'   => $field['field_default'],
                 );
-                $className = get_called_class();
+
                 $className::addFieldToAll($data, $className);
             }
         }
@@ -122,7 +125,7 @@ abstract class Som_Model_Abstract
         if(!empty(self::$fieldsCache[$className])) {
             $this->fields = self::$fieldsCache[$className];
         } else {
-            $this->fields = self::$fieldsCache[$className] = array_merge(static::fieldList(), static::$_extraFields);
+            $this->fields = self::$fieldsCache[$className] = array_merge(static::fieldList(), self::$_extraFields[$className]);
         }
         foreach ($this->fields as $name => $field) {
             if (!isset($field['link']) ||
@@ -776,7 +779,7 @@ abstract class Som_Model_Abstract
         if($cache && !empty(self::$fieldsCache[$className])) {
             $fields = self::$fieldsCache[$className];
         } else {
-            $fields = self::$fieldsCache[$className] = array_merge(static::fieldList(), static::$_extraFields);
+            $fields = self::$fieldsCache[$className] = array_merge(static::fieldList(), self::$_extraFields[$className]);
         }
         // Не включаем связи ко многим и, также, указывающие на другое поле
         $cols[$className] = array();
@@ -880,15 +883,17 @@ abstract class Som_Model_Abstract
             throw new Exception("Field «{$params['name']}» already exists in model fields list");
         }
 
-        if($chekAdded && array_key_exists($params['name'], static::$_extraFields)){
+        $className = get_called_class();
+
+        if($chekAdded && is_array(self::$_extraFields[$className]) && is_array(self::$_extraFields[$className][$params['name']]) &&
+                            array_key_exists($params['name'], self::$_extraFields[$className][$params['name']])){
             throw new Exception("Field «{$params['name']}» already added to model by «".
-                static::$_extraFields[$params['name']]['donor']."»");
+                self::$_extraFields[$className][$params['name']]['donor']."»");
         }
 
         $params['donor'] = $donor;
-        static::$_extraFields[$params['name']] = $params;
+        self::$_extraFields[$className][$params['name']] = $params;
 
-        $className = get_called_class();
         self::$fieldsCache[$className] = array();
     }
 
