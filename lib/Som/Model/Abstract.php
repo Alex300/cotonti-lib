@@ -887,10 +887,10 @@ abstract class Som_Model_Abstract
 
         $className = get_called_class();
 
-        if($chekAdded && is_array(self::$_extraFields[$className]) && is_array(self::$_extraFields[$className][$params['name']]) &&
-                            array_key_exists($params['name'], self::$_extraFields[$className][$params['name']])){
-            throw new Exception("Field «{$params['name']}» already added to model by «".
-                self::$_extraFields[$className][$params['name']]['donor']."»");
+        if($chekAdded && is_array(self::$_extraFields[$className]) && !empty(self::$_extraFields[$className][$params['name']]) &&
+                                 array_key_exists($params['name'], self::$_extraFields[$className][$params['name']])){
+            throw new Exception("Field «{$params['name']}» already added to model by «" .
+                static::$_extraFields[$params['name']]['donor'] . "»");
         }
 
         $params['donor'] = $donor;
