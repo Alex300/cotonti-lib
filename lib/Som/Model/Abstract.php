@@ -7,7 +7,6 @@
  * @author Gert Hengeveld (ORM from cot-factory)
  * @author Mankov
  * @author Kalnov Alexey <kalnov_alexey@yandex.ru> http://portal30.ru
- * @version 1.2
  *
  * @static string $_dbtype
  * @static string $_tbname
@@ -18,7 +17,6 @@
  */
 abstract class Som_Model_Abstract
 {
-
     /**
      * @var Som_Model_Mapper_Abstract
      */
@@ -45,17 +43,36 @@ abstract class Som_Model_Abstract
     protected $_data = array();
 
     /**
-     * @var array Список полей, описанный в моделе и/или получаемый из полей БД. С типами данных.
+     * Данные связей
+     * @var array
      */
-    protected $fields = array();
-    protected static $fieldsCache = array();
+    protected $_linkData = array();
 
     /**
-     * Model extrafields. Поля присутсвубщие в таблице, но не описанные в fieldList().
+     * Поле, для хранения временных данных. Их можно записать и прочитать, Они не сохраняются в БД
+     * Например $user->auth_write = true
+     * @var array
+     */
+    protected $_extraData = array();
+
+    /**
+     * Поле, для хранения старых данных. Тех, что были до вызова сеттера для данного поля. Позволяет контролировать
+     * изменилось ли поле.
+     * @var array
+     */
+    protected $_oldData = array();
+
+    /**
+     * @var array Список полей, описанный в моделе и/или получаемый из полей БД. С типами данных.
+     */
+    protected static $fields = array();
+
+    /**
+     * Model extrafields. Поля присутсвующие в таблице, но не описанные в fieldList().
      * Они могут быть созданы другими модулями
      * @var array
      */
-    public static $_extraFields = array();
+    protected static $_extraFields = array();
 
     protected $_e;
 
@@ -64,7 +81,9 @@ abstract class Som_Model_Abstract
 
     /**
      * Static constructor
+     * @param string $db Data base connection config name
      * Модель не проверяет наличие таблицы и всех полей, а наивно доверяет данным из метода fieldList()
+     * @throws Exception
      */
     public static function __init($db = 'db'){
         global $cot_extrafields;
@@ -78,7 +97,10 @@ abstract class Som_Model_Abstract
 
             static::$_dbtype = cot::$cfg[$db]['adapter'];
         }
-        static::$_db = $dbAdapter = static::getMapper($db);
+        static::$_db = $dbAdapter = static::getAdapter($db);
+
+        $className = get_called_class();
+        self::$_extraFields[$className] = array();
 
         // load Extrafields
         if(!empty($cot_extrafields[static::$_tbname])) {
@@ -96,7 +118,7 @@ abstract class Som_Model_Abstract
                     'nullable'  => ($field['field_required'] == 1) ? false : true,
                     'default'   => $field['field_default'],
                 );
-                $className = get_called_class();
+
                 $className::addFieldToAll($data, $className);
             }
         }
@@ -116,17 +138,11 @@ abstract class Som_Model_Abstract
     {
         $pkey = static::primaryKey();
 
-        $className = get_called_class();
-
         // Инициализация полей
-        if(!empty(self::$fieldsCache[$className])) {
-            $this->fields = self::$fieldsCache[$className];
-        } else {
-            $this->fields = self::$fieldsCache[$className] = array_merge(static::fieldList(), static::$_extraFields);
-        }
-        foreach ($this->fields as $name => $field) {
+        $fields = static::getFields();
+        foreach ($fields as $name => $field) {
             if (!isset($field['link']) ||
-                (in_array($field['link']['relation'], array('toone', 'toonenull')) && !isset($field['link']['localKey'])) ){
+                (in_array($field['link']['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL)) && !isset($field['link']['localKey'])) ){
                 // Дефолтное значение
                 $this->_data[$name] = isset($field['default']) ? $field['default'] : null;
             }
@@ -142,10 +158,10 @@ abstract class Som_Model_Abstract
         }
 
         // Для существующих объектов грузим Многие ко многим (только id)
-        if (isset($data[$pkey]) && $data[$pkey] > 0 && !empty($this->fields)) {
-            foreach ($this->fields as $key => $field) {
-                if (isset($field['link']) && in_array($field['link']['relation'], array('tomanynull', 'tomany'))) {
-                    $this->fields[$key]['data'] = static::$_db->loadXRef($field['link']["model"], $data[$pkey], $key);
+        if (isset($data[$pkey]) && $data[$pkey] > 0 && !empty($fields)) {
+            foreach ($fields as $key => $field) {
+                if (isset($field['link']) && in_array($field['link']['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+                    $this->_linkData[$key] = static::$_db->loadXRef($field['link']["model"], $data[$pkey], $key);
                 }
             }
         }
@@ -161,14 +177,49 @@ abstract class Som_Model_Abstract
      * @throws Exception
      * @return mixed
      */
-    public function __set($name, $val)
-    {
+    public function __set($name, $val) {
+        $fields = static::getFields();
+
         $link = false;
         // Проверка связей
-        if (isset($this->fields[$name]) && $this->fields[$name]['type'] == 'link') {
-            $link = (array)$this->fields[$name]['link'];
+        if (isset($fields[$name]) && $fields[$name]['type'] == 'link') {
+            $link = (array)$fields[$name]['link'];
             $localkey = (!empty($link['localKey'])) ? $link['localKey'] : $name;
             $className = $link['model'];
+        }
+
+        // Set old data
+        //if (!isset($this->fields[$name]['oldData'])) {
+        if(isset($fields[$name]) && !isset($this->_oldData[$name])) {
+            if($link) {
+                if (in_array($link['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+                    $newData = $val;
+                    $oldData = (isset($this->_linkData[$name])) ? $this->_linkData[$name] : null;
+                    if(!is_array($newData)) $newData = array($newData);
+                    if(!is_array($oldData)) $oldData = array($oldData);
+                    if(!static::compareArrays($oldData, $newData)) $this->_oldData[$name] = $oldData;
+
+                } elseif(in_array($link['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
+                    if ($val instanceof Som_Model_Abstract) {
+                        if($this->_data[$localkey] != $val->getId()) {
+                            $this->_oldData[$name] = $this->_data[$localkey];
+                        }
+                    } else {
+                        if($this->_data[$localkey] != $val) {
+                            $this->_oldData[$name] = $this->_data[$localkey];
+                        }
+                    }
+                }
+            //} elseif($this->fields[$name]['type'] == 'timestamp'){
+            } elseif(in_array($fields[$name]['type'], array('datetime', 'date', 'timestamp')) ){
+                if(strtotime($this->_data[$name]) != strtotime($val)){
+                    $this->_oldData[$name] = $this->_data[$name];
+                }
+
+            } elseif($this->_data[$name] != $val) {
+                $this->_oldData[$name] = $this->_data[$name];
+            }
+
         }
 
         $methodName = 'set' . ucfirst($name);
@@ -184,11 +235,9 @@ abstract class Som_Model_Abstract
                     $val = $val->getId();
                 } else {
                     throw new Exception("Тип переданного значения не соответствует пипу поля. Должно быть: $className");
-                    exit();
                 }
             } elseif (in_array($name, static::getColumns())) {
                 throw new Exception("Связь для поля '{$name}' не найдена");
-                exit();
             }
         }
 
@@ -196,20 +245,19 @@ abstract class Som_Model_Abstract
         // Если это связь
         if ($link) {
             // Один ко многим
-            if (in_array($link['relation'], array('toonenull', 'toone'))) {
+            if (in_array($link['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
                 $this->_data[$localkey] = $val;
-
-                return;
+                return true;
             }
-            if (in_array($link['relation'], array('tomanynull', 'tomany'))) {
+            if (in_array($link['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
                 if (!is_array($val)) $val = array($val);
-                $this->fields[$name]['data'] = array();
+                $this->_linkData[$name] = array();
                 foreach ($val as $value) {
                     // todo проверка типов
                     if ($value instanceof $className) {
-                        $this->fields[$name]['data'][] = $value->getId();
+                        $this->_linkData[$name][] = $value->getId();
                     } else {
-                        $this->fields[$name]['data'][] = $value;
+                        $this->_linkData[$name][] = $value;
                     }
                 }
             }
@@ -218,7 +266,7 @@ abstract class Som_Model_Abstract
         // input filter
         if (in_array($name, static::getColumns())) {
             // @todo общие типы данных, независимые от типа БД
-            switch ($this->fields[$name]['type']) {
+            switch ($fields[$name]['type']) {
                 case 'tinyint':
                 case 'smallint':
                 case 'mediumint':
@@ -240,7 +288,12 @@ abstract class Som_Model_Abstract
                     break;
             }
             $this->_data[$name] = $val;
+
+        } elseif (!$link) {
+            $this->_extraData[$name] = $val;
         }
+
+        return true;
     }
 
     /**
@@ -250,39 +303,35 @@ abstract class Som_Model_Abstract
      *
      * @return null|mixed|Som_Model_Abstract
      */
-    public function __get($name)
-    {
+    public function __get($name) {
         $methodName = 'get' . ucfirst($name);
         if (method_exists($this, $methodName)) {
             return $this->$methodName();
         }
 
+        $fields = static::getFields();
 
         // Проверка на наличие связей
-        if (isset($this->fields[$name]) && $this->fields[$name]['type'] == 'link') {
-            $list = (array)$this->fields[$name]['link'];
+        if (isset($fields[$name]) && $fields[$name]['type'] == 'link') {
+            $list = (array)$fields[$name]['link'];
 
             /** @var Som_Model_Abstract $modelName */
             $modelName = $list['model'];
             $localkey = !empty($list['localKey']) ? $list['localKey'] : $name;
 
             // Один ко многим
-            if (in_array($list['relation'], array('toonenull', 'toone'))) {
-                if (empty($this->_data[$localkey]))
-                    return null;
+            if (in_array($list['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
+                if (empty($this->_data[$localkey])) return null;
 
                 return $modelName::getById($this->_data[$localkey]);
             }
 
             // Многие ко многим
-            if (in_array($list['relation'], array('tomanynull', 'tomany'))) {
-                if (!empty($this->fields[$name]['data'])) {
+            if (in_array($list['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+                if (!empty($this->_linkData[$name])) {
                     // ХЗ как лучше, find или в цикле getById (getById кешируется на время выполенния, но за раз много запрсов)
                     return $modelName::find(array(
-                        array(
-                            $modelName::primaryKey(),
-                            $this->fields[$name]['data']
-                        )
+                        array( $modelName::primaryKey(), $this->_linkData[$name] )
                     ));
                 } else {
                     return null;
@@ -291,41 +340,56 @@ abstract class Som_Model_Abstract
             }
         }
 
-        return isset($this->_data[$name]) ? $this->_data[$name] : null;
+        if (isset($this->_data[$name])) {
+            return $this->_data[$name];
+        }
+        if (isset($this->_extraData[$name])) {
+            return $this->_extraData[$name];
+        }
+
+        return null;
     }
 
     /**
      * isset() handler for object properties.
      *
      * @param $column
-     *
      * @return bool
      */
-    public function __isset($column)
-    {
+    public function __isset($column) {
         $methodName = 'isset' . ucfirst($column);
         if (method_exists($this, $methodName)) {
             return $this->$methodName();
         }
 
+        $fields = static::getFields();
+
         // Проверка на наличие связей
-        if (isset($this->fields[$column]) && $this->fields[$column]['type'] == 'link') {
-            $list = (array)$this->fields[$column]['link'];
+        if (isset($fields[$column]) && $fields[$column]['type'] == 'link') {
+            $list = (array)$fields[$column]['link'];
 
             $localkey = !empty($list['localKey']) ? $list['localKey'] : $column;
             // Один ко многим
-            if (in_array($list['relation'], array('toonenull', 'toone'))) {
+            if (in_array($list['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
                 return !empty($this->_data[$localkey]);
             }
 
             // Многие ко многим
-            if (in_array($list['relation'], array('tomanynull', 'tomany'))) {
-                return !empty($this->fields[$column]['data']);
+            if (in_array($list['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+                return !empty($this->_linkData[$column]);
 
             }
         }
 
-        return isset($this->_data[$column]);
+        if (isset($this->_data[$column])) {
+            return true;
+        }
+
+        if (isset($this->_extraData[$column])) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -334,33 +398,31 @@ abstract class Som_Model_Abstract
      * @param string $column Column name
      * @return mixed|void
      */
-    public function __unset($column)
-    {
+    public function __unset($column) {
         $methodName = 'unset' . ucfirst($column);
         if (method_exists($this, $methodName)) {
             return $this->$methodName();
         }
 
+        $fields = static::getFields();
+
         // Проверка на наличие связей
-        if (isset($this->fields[$column]) && $this->fields[$column]['type'] == 'link') {
-            $list = (array)$this->fields[$column]['link'];
+        if (isset($fields[$column]) && $fields[$column]['type'] == 'link') {
+            $list = (array)$fields[$column]['link'];
 
             $localkey = !empty($list['localKey']) ? $list['localKey'] : $column;
             // Один ко многим
-            if (in_array($list['relation'], array('toonenull', 'toone'))) {
+            if (in_array($list['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
                 unset($this->_data[$localkey]);
             }
 
             // Многие ко многим
-            if (in_array($list['relation'], array('tomanynull', 'tomany'))) {
-                unset($this->fields[$column]['data']);
-
+            if (in_array($list['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+                unset($this->_linkData[$column]);
             }
         }
 
-
-        if (isset($this->_data[$column]))
-            unset($this->_data[$column]);
+        if (isset($this->_data[$column])) unset($this->_data[$column]);
     }
 
     /**
@@ -368,8 +430,7 @@ abstract class Som_Model_Abstract
      *
      * @return array
      */
-    function toArray()
-    {
+    function toArray() {
         $data = $this->_data;
         return $data;
     }
@@ -385,8 +446,9 @@ abstract class Som_Model_Abstract
      * @throws Exception
      * @return bool
      */
-    public function setData($data, $safe=true)
-    {
+    public function setData($data, $safe = true) {
+        $fields = static::getFields();
+
         if ($this->beforeSetData($data)) {
             $class = get_class($this);
             if ($data instanceof $class)
@@ -395,7 +457,7 @@ abstract class Som_Model_Abstract
                 throw new  Exception("Data must be an Array or instance of $class Class");
             }
             foreach ($data as $key => $value) {
-                if ($safe && isset($this->fields[$key]['safe']) && $this->fields[$key]['safe']){
+                if ($safe && isset($fields[$key]['safe']) && $fields[$key]['safe']) {
                     if(!cot::$usr['isadmin'] && cot::$env['ext'] != 'admin'){
                         throw new Exception("Trying to write value «{$value}» to protected field «{$key}» of model «{$class}»");
                     }
@@ -433,8 +495,8 @@ abstract class Som_Model_Abstract
                 $this->_data[$field] = $this->_data[$field] + $val;
             }
             $pkey = static::primaryKey();
-            return static::$_db->inc(static::$_tbname, $pair,
-                " {$pkey} = {$this->getId()} " .$conditions);
+
+            return static::$_db->inc(static::$_tbname, $pair, " {$pkey} = {$this->getId()} " .$conditions);
         }
     }
 
@@ -460,8 +522,8 @@ abstract class Som_Model_Abstract
                 $this->_data[$field] = $this->_data[$field] - $val;
             }
             $pkey = static::primaryKey();
-            return static::$_db->dec(static::$_tbname, $pair,
-                " {$pkey} = {$this->getId()} " .$conditions);
+
+            return static::$_db->dec(static::$_tbname, $pair, " {$pkey} = {$this->getId()} " .$conditions);
         }
     }
     // ==== /Методы для манипуляции с данными ====
@@ -542,8 +604,7 @@ abstract class Som_Model_Abstract
      *
      * @return Som_Model_Abstract[]
      */
-    protected static function fetch($conditions = array(), $limit = 0, $offset = 0, $order = '')
-    {
+    protected static function fetch($conditions = array(), $limit = 0, $offset = 0, $order = '') {
         return static::$_db->fetch($conditions, $limit, $offset, $order);
     }
 
@@ -553,11 +614,10 @@ abstract class Som_Model_Abstract
      * Save data
      *
      * @param Som_Model_Mapper_Abstract|array|null $data
-
      * @return int id of saved record
      */
-    public function save($data = null)
-    {
+    public function save($data = null) {
+        $id = null;
         if ($this->beforeSave($data)) {
             if (is_array($data)) {
                 $this->setData($data);
@@ -576,7 +636,10 @@ abstract class Som_Model_Abstract
             }
         }
 
-        if($id) $this->afterSave();
+        if($id) {
+            $this->afterSave();
+            $this->_oldData = array();
+        }
 
         return $id;
     }
@@ -714,20 +777,31 @@ abstract class Som_Model_Abstract
      * @param $column
      * @return string
      */
-    public function getFieldLabel($column)
-    {
-        if (isset($this->fields[$column]['description'])) return $this->fields[$column]['description'];
+    public function getFieldLabel($column) {
+        $fields = static::getFields();
+        if (isset($fields[$column]['description'])) return $fields[$column]['description'];
 
         return '';
     }
 
     /**
      * Возвращает все поля, включая дополнительные
+     *
+     * @param bool $real  получить поля напрямую из таблицы
+     * @param bool $cache Использовать кеш периода выполнения
+     *
      * @return array
      */
-    public function getFields()
-    {
-        return $this->fields;
+    public static function getFields($real = false, $cache = true) {
+        if ($real) return static::$_db->getFields(static::$_tbname);
+
+        $className = get_called_class();
+
+        if($cache && !empty(self::$fields[$className])) return self::$fields[$className];
+
+        self::$fields[$className] = array_merge(static::fieldList(), self::$_extraFields[$className]);
+
+        return self::$fields[$className];
     }
 
     /**
@@ -736,15 +810,16 @@ abstract class Som_Model_Abstract
      * @param $params
      * @return null
      */
-    public function getField($params)
-    {
-        if (is_string($params)) return (!empty($this->fields[$params])) ? $this->fields[$params] : null;
+    public function getField($params) {
+        $fields = static::getFields();
+
+        if (is_string($params)) return (!empty($fields[$params])) ? $fields[$params] : null;
         // Если передали объект, надо искать связь
-        if (is_a($params, 'Som_Model_Abstract')) $params = array('model' => get_class($params));
+        if ($params instanceof Som_Model_Abstract) $params = array('model' => get_class($params));
 
         if (!empty($params['model'])) {
-            if (is_a($params['model'], 'Som_Model_Abstract')) $params['model'] = get_class($params['model']);
-            foreach ($this->fields as $fld) {
+            if ($params['model'] instanceof Som_Model_Abstract) $params['model'] = get_class($params['model']);
+            foreach ($fields as $fld) {
                 if ($fld['type'] == 'link' && $fld['model'] == $params['model']) {
                     return $fld;
                 }
@@ -773,16 +848,12 @@ abstract class Som_Model_Abstract
 
         if($cache && !empty($cols[$className]))  return $cols[$className];
 
-        if($cache && !empty(self::$fieldsCache[$className])) {
-            $fields = self::$fieldsCache[$className];
-        } else {
-            $fields = self::$fieldsCache[$className] = array_merge(static::fieldList(), static::$_extraFields);
-        }
+        $fields = static::getFields($real, $cache);
         // Не включаем связи ко многим и, также, указывающие на другое поле
         $cols[$className] = array();
         foreach ($fields as $name => $field) {
             if (!isset($field['link']) ||
-                (in_array($field['link']['relation'], array('toone', 'toonenull')) && !isset($field['link']['localKey']))
+                (in_array($field['link']['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL)) && !isset($field['link']['localKey']))
             ) {
                 $cols[$className][] = $name;
             }
@@ -797,9 +868,11 @@ abstract class Som_Model_Abstract
      * @return mixed
      */
     public function rawValue($column){
-        if($this->fields[$column]['type'] == 'link' && in_array($this->fields[$column]['link']['relation'],
-                array('tomany', 'tomanynull'))) {
-            if(isset($this->fields[$column]['data'])) return $this->fields[$column]['data'];
+        $fields = static::getFields();
+
+        if($fields[$column]['type'] == 'link' && in_array($fields[$column]['link']['relation'],
+                array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+            if(isset($this->_linkData[$column])) return $this->_linkData[$column];
             return null;
 
         } elseif (isset($this->_data[$column])) {
@@ -828,13 +901,13 @@ abstract class Som_Model_Abstract
             }
         }
 
-        $fields = $this->getFields();
+        $fields = static::getFields();
         foreach ($fields as $name => $field) {
             if ($name !== static::$_primary_key) {
                 if (isset($field['nullable']) && !$field['nullable']) $requiredFields[] = $name;
 
                 if (isset ($field['type']) && ($field['type'] == 'link')
-                    && (in_array($field['link']['relation'], array('tomany', 'toone'))) ) {
+                    && (in_array($field['link']['relation'], array(Som::TO_MANY, Som::TO_ONE))) ) {
                     $requiredFields[] = $name;
                 }
             }
@@ -880,16 +953,18 @@ abstract class Som_Model_Abstract
             throw new Exception("Field «{$params['name']}» already exists in model fields list");
         }
 
-        if($chekAdded && array_key_exists($params['name'], static::$_extraFields)){
-            throw new Exception("Field «{$params['name']}» already added to model by «".
-                static::$_extraFields[$params['name']]['donor']."»");
+        $className = get_called_class();
+
+        if($chekAdded && is_array(self::$_extraFields[$className]) && !empty(self::$_extraFields[$className][$params['name']]) &&
+                                 array_key_exists($params['name'], self::$_extraFields[$className][$params['name']])){
+            throw new Exception("Field «{$params['name']}» already added to model by «" .
+                static::$_extraFields[$params['name']]['donor'] . "»");
         }
 
         $params['donor'] = $donor;
-        static::$_extraFields[$params['name']] = $params;
+        self::$_extraFields[$className][$params['name']] = $params;
 
-        $className = get_called_class();
-        self::$fieldsCache[$className] = array();
+        self::$fields[$className] = array();
     }
 
     // ==== /Методы для работы с полями ====
@@ -930,22 +1005,29 @@ abstract class Som_Model_Abstract
         return $this;
     }
 
-    public function hasErrors()
-    {
+    public function hasErrors($field = null) {
+        if (!is_null($field)) {
+            return (isset($this->_errors[$field]) && count($this->_errors[$field]));
 
+        } elseif (count($this->_errors)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
      * Проверяет модель на наличие ошибок
      * Этот метод полезно переопределять для создания проверок спецефичных для конкретной модели
-     * @param array $fields
-     *
-     * @return boolean
+     * @param array $validateFields
+     * @return bool
+     * @throws Exception
      * @todo дописать метод
      */
-    public function validate($fields = null)
-    {
+    public function validate($validateFields = null) {
         $validators = $this->validators();
+
+        $fields = static::getFields();
 
         foreach($this->requiredFields() as $field){
             $validators[] = array($field, 'required');
@@ -967,25 +1049,25 @@ abstract class Som_Model_Abstract
         $this->validators = array_merge($this->validators, $m_validators);
 
 
-        if (empty($fields)) {
+        if (empty($validateFields)) {
             // Получить все поля модели
-            $fields = static::getColumns();
-            foreach ($this->fields as $name => $fld) {
-                if (!in_array($name, $fields))
-                    $fields[] = $name;
+            $validateFields = static::getColumns();
+            foreach ($fields as $name => $fld) {
+                if (!in_array($name, $validateFields)) $validateFields[] = $name;
             }
         }
 
-        foreach ($fields as $name) {
+        foreach ($validateFields as $name) {
             $value = null;
             if (isset($this->_data[$name])) {
                 $value = $this->_data[$name];
-            } elseif (isset($this->fields[$name]) && $this->fields[$name]['type'] == 'link') {
-                $list = (array)$this->fields[$name]['link'];
+
+            } elseif (isset($fields[$name]) && $fields[$name]['type'] == 'link') {
+                $list = (array)$fields[$name]['link'];
                 // Многие ко многим
-                if (in_array($list['relation'], array('tomanynull', 'tomany')) && !empty($this->fields[$name]['data'])
-                ) {
-                    $value = $this->fields[$name]['data'];
+                if (in_array($list['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL)) &&
+                                                                            !empty($this->_linkData[$name]) ) {
+                    $value = $this->_linkData[$name];
                 }
             }
             if (isset($this->validators[$name]) && count($this->validators[$name]) > 0) {
@@ -1002,17 +1084,17 @@ abstract class Som_Model_Abstract
                         // Проверка на callback
                         try {
                             $res = call_user_func_array($validator, array($value));
-                            if ($res !== true)
-                                $this->_errors[$name][] = $res;
+                            if ($res !== true) $this->_errors[$name][] = $res;
+
                         } catch (Exception $e) {
                             throw new Exception("Не правильный CallBack validator для поля '{$name}'");
-                            return false;
+
                         }
                     } elseif (is_string($validator)) {
                         switch (mb_strtolower($validator)) {
                             case 'required':
                                 $this->_requiredFields[$name] = 1;
-                                if ($value == '') {
+                                if (($value === '') || (is_null($value))) {
                                     $error = 'Обязательное для заполнения';
                                     $this->_errors[$name][] = $error;
                                 }
@@ -1027,8 +1109,8 @@ abstract class Som_Model_Abstract
                 }
             }
             // Проверка на соотвествие типу
-            if (!empty($this->fields[$name])) {
-                switch (mb_strtolower($this->fields[$name]['type'])) {
+            if (!empty($fields[$name])) {
+                switch (mb_strtolower($fields[$name]['type'])) {
                     case 'int':
                     case 'integer':
 
@@ -1050,22 +1132,22 @@ abstract class Som_Model_Abstract
     // ==== /Методы для Валидации ====
 
     /**
-     * Mapper Factory
+     * Adapter Factory
      * @param string $db connection name
      * @throws Exception
      * @return Som_Model_Mapper_Abstract
      */
-    public static function getMapper($db = 'db') {
+    public static function getAdapter($db = 'db') {
         $className = get_called_class();
 
         if (!empty(static::$_tbname) && isset(static::$_dbtype)) {
-            return Som_Model_Mapper_Manager::getMapper($db, array(
+            return Som::getAdapter($db, array(
                         "class" => get_called_class(),
                         "tbname" => static::$_tbname,
                         "pkey" => static::primaryKey(),
                     ));
         } else {
-            throw new Exception("Не верно заданы параметры модели: $className");
+            throw new Exception("Wrong model parameters: $className");
         }
     }
 
@@ -1106,13 +1188,45 @@ abstract class Som_Model_Abstract
      *
      * @return string
      */
-    public static function primaryKey(){
+    public static function primaryKey() {
         return isset(static::$_primary_key) ? static::$_primary_key : 'id';
     }
 
-    function __toString()
-    {
+    function __toString() {
         return $this->getId();
+    }
+
+
+    protected static function compareArrays($arrayA , $arrayB) {
+        $A = array();
+        if(!empty($arrayA)) {
+            foreach($arrayA as $key => $val) {
+                if($val instanceof Som_Model_Abstract) {
+                    $A[] = $val->getId();
+                } else {
+                    $A[] = $val;
+                }
+            }
+        }
+
+        $B = array();
+        if(!empty($arrayB)) {
+            foreach($arrayB as $key => $val) {
+                if($val instanceof Som_Model_Abstract) {
+                    $B[] = $val->getId();
+                } else {
+                    $B[] = $val;
+                }
+            }
+        }
+
+        if(count($A) > count($B)){
+            $diff = array_diff($A,$B);
+        } else {
+            $diff = array_diff($B,$A);
+        }
+
+        return (!empty($diff)?false:true);
     }
 
     /* =========================== */
@@ -1120,8 +1234,5 @@ abstract class Som_Model_Abstract
      * Конфиг модели. Информация обо всех полях
      * @return array
      */
-    public static function fieldList()
-    {
-        return array();
-    }
+    public static function fieldList() { return array(); }
 }

@@ -1,12 +1,23 @@
 <?php
-/**
- * DB connection Mapper Factory
- */
 
-class Som_Model_Mapper_Manager {
+/**
+ * ORM System
+ * SOM - Simple Object Manipulation
+ *
+ * @author Gert Hengeveld (ORM from cot-factory)
+ * @author Mankov
+ * @author Kalnov Alexey <kalnov_alexey@yandex.ru> http://portal30.ru
+ * @version 1.3
+ */
+class Som
+{
+    const TO_ONE = 'toone';
+    const TO_ONE_NULL = 'toonenull';
+    const TO_MANY = 'tomany';
+    const TO_MANY_NULL = 'tomanynull';
 
     /**
-     * Mapper Factory
+     * Adapter Factory
      *
      * @param string $db
      * @param array $dbinfo
@@ -26,7 +37,7 @@ class Som_Model_Mapper_Manager {
      * @return Som_Model_Mapper_Abstract
      * @throws Exception
      */
-    public static function getMapper($db = 'db', $dbinfo = array()) {
+    public static function getAdapter($db = 'db', $dbinfo = array()) {
 
         // Default cotonti connection
         if($db == 'db') return new Som_Model_Mapper_Mysql($dbinfo, 'db');

@@ -224,8 +224,8 @@ abstract class Som_Model_Mapper_Abstract
      * @param  int $offset
      * @param array|string $order
      * @param array $columns
-     * @internal param array $cond
-     * @return Som_Model_Abstract[]|bool
+     * @return bool|Som_Model_Abstract[]
+     * @throws Exception
      */
     public function fetch($conditions = array(), $limit = 0, $offset = 0, $order = '', $columns = Array())
     {
@@ -331,9 +331,9 @@ abstract class Som_Model_Mapper_Abstract
      * @param bool $ignore Ignore duplicate key errors on insert
      * @param array $update_fields List of fields to be updated with ON DUPLICATE KEY UPDATE
      * @return int The number of affected records
+     * @throws Exception
      */
-    public function insert($table_name, $data = false, $insert_null = false, $ignore = false, $update_fields = array())
-    {
+    public function insert($table_name, $data = false, $insert_null = false, $ignore = false, $update_fields = array()) {
         $model = null;
         $tq = $this->tableQuote;
 
@@ -417,13 +417,14 @@ abstract class Som_Model_Mapper_Abstract
 
             if ($id > 0 && !empty($model)) {
                 $data[$pkey] = $id;
-                $fields = $model->getFields();
+                $fields = $model::getFields();
                 $model->{$pkey} = $id;
                 if (!empty($fields)) {
-                    foreach ($fields as $field) {
-                        if (isset($field['link']) && in_array($field['link']['relation'], array('tomanynull', 'tomany'))) {
-                            if (!isset($field["data"])) $field["data"] = null;
-                            $this->saveXRef($field['link']["model"], $data[$pkey], $field["data"], $field['name']);
+                    foreach ($fields as $fieldName => $field) {
+                        if (isset($field['link']) && in_array($field['link']['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+                            $fieldData = $model->rawValue($fieldName);
+                            if (empty($fieldData)) $fieldData = null;
+                            $this->saveXRef($field['link']["model"], $data[$pkey], $fieldData, $fieldName);
                         }
                     }
                 }
@@ -460,9 +461,7 @@ abstract class Som_Model_Mapper_Abstract
      * @return int The number of affected records or FALSE on error
      * @throws Exception
      */
-    public function update($table_name, $data = false, $condition = '', $parameters = array(), $update_null = false)
-    {
-
+    public function update($table_name, $data = false, $condition = '', $parameters = array(), $update_null = false) {
         $model = null;
         $tq = $this->tableQuote;
 
@@ -485,12 +484,13 @@ abstract class Som_Model_Mapper_Abstract
 
         // Сохранить связи
         if (!empty($model)) {
-            $fields = $model->getFields();
+            $fields = $model::getFields();
             if (!empty($fields)) {
-                foreach ($fields as $field) {
-                    if (isset($field['link']) && in_array($field['link']['relation'], array('tomanynull', 'tomany'))) {
-                        if (!isset($field["data"])) $field["data"] = null;
-                        $this->saveXRef($field['link']["model"], $id, $field["data"], $field['name']);
+                foreach ($fields as $fieldName => $field) {
+                    if (isset($field['link']) && in_array($field['link']['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+                        $fieldData = $model->rawValue($fieldName);
+                        if (empty($fieldData)) $fieldData = null;
+                        $this->saveXRef($field['link']["model"], $id, $fieldData, $fieldName);
                     }
                 }
             }
@@ -564,9 +564,7 @@ abstract class Som_Model_Mapper_Abstract
      * @param array $parameters Array of statement input parameters, see http://www.php.net/manual/en/pdostatement.execute.php
      * @return int Number of records removed on success or FALSE on error
      */
-    public function delete($table_name, $condition = '', $parameters = array())
-    {
-
+    public function delete($table_name, $condition = '', $parameters = array()) {
         $model = null;
         $tq = $this->tableQuote;
 
@@ -582,7 +580,7 @@ abstract class Som_Model_Mapper_Abstract
             $fields = $model->fieldList();
             if (!empty($fields)) {
                 foreach ($fields as $field) {
-                    if ($field['type'] == 'link' && in_array($field['link']['relation'], array('tomanynull', 'tomany'))) {
+                    if ($field['type'] == 'link' && in_array($field['link']['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
                         $localkey = (!empty($field['link']['localKey'])) ? $field['link']['localKey'] : $field['name'];
                         $this->deleteXRef($field['link']["model"], $id, $localkey);
                     }
@@ -684,7 +682,7 @@ abstract class Som_Model_Mapper_Abstract
         if (empty($field['type'])) return false;
 
         if ($field['type'] == 'link') {
-            if (in_array($field['link']['relation'], array('toonenull', 'toone'))) {
+            if (in_array($field['link']['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
                 $field['type'] = 'bigint';
             } else {
                 return false;
