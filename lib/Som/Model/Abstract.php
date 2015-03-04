@@ -8,11 +8,6 @@
  * @author Mankov
  * @author Kalnov Alexey <kalnov_alexey@yandex.ru> http://portal30.ru
  *
- * @static string $_dbtype
- * @static string $_tbname
- * @static Som_Model_Mapper_Abstract $_db;
- * @static string $_primary_key
- *
  * @todo    Hooks for before/after insert, update, delete methods
  */
 abstract class Som_Model_Abstract
@@ -189,7 +184,6 @@ abstract class Som_Model_Abstract
         }
 
         // Set old data
-        //if (!isset($this->fields[$name]['oldData'])) {
         if(isset($fields[$name]) && !isset($this->_oldData[$name])) {
             if($link) {
                 if (in_array($link['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
@@ -210,7 +204,7 @@ abstract class Som_Model_Abstract
                         }
                     }
                 }
-            //} elseif($this->fields[$name]['type'] == 'timestamp'){
+
             } elseif(in_array($fields[$name]['type'], array('datetime', 'date', 'timestamp')) ){
                 if(strtotime($this->_data[$name]) != strtotime($val)){
                     $this->_oldData[$name] = $this->_data[$name];
@@ -223,7 +217,7 @@ abstract class Som_Model_Abstract
         }
 
         $methodName = 'set' . ucfirst($name);
-        if (method_exists($this, $methodName)) {
+        if ($methodName != 'setData' && method_exists($this, $methodName)) {
             return $this->$methodName($val);
         }
 
@@ -256,7 +250,7 @@ abstract class Som_Model_Abstract
                     // todo проверка типов
                     if ($value instanceof $className) {
                         $this->_linkData[$name][] = $value->getId();
-                    } else {
+                    } elseif ($value) {
                         $this->_linkData[$name][] = $value;
                     }
                 }
@@ -328,11 +322,11 @@ abstract class Som_Model_Abstract
 
             // Многие ко многим
             if (in_array($list['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
-                if (!empty($this->_linkData[$name])) {
+                if (!empty($this->_linkData[$name]) && is_array($this->_linkData[$name]) && count($this->_linkData[$name]) > 0) {
                     // ХЗ как лучше, find или в цикле getById (getById кешируется на время выполенния, но за раз много запрсов)
                     return $modelName::find(array(
                         array( $modelName::primaryKey(), $this->_linkData[$name] )
-                    ));
+                    ), 0, 0, array($modelName::primaryKey()));
                 } else {
                     return null;
                 }
@@ -423,11 +417,11 @@ abstract class Som_Model_Abstract
         }
 
         if (isset($this->_data[$column])) unset($this->_data[$column]);
+        if (isset($this->_extraData[$column])) unset($this->_extraData[$column]);
     }
 
     /**
      * Возвращает элемент в виде массива
-     *
      * @return array
      */
     function toArray() {
@@ -435,7 +429,7 @@ abstract class Som_Model_Abstract
         return $data;
     }
 
-    protected function beforeSetData($data){ return true; }
+    protected function beforeSetData(&$data){ return true; }
 
     /**
      * Заполняет модель данными
@@ -462,7 +456,7 @@ abstract class Som_Model_Abstract
                         throw new Exception("Trying to write value «{$value}» to protected field «{$key}» of model «{$class}»");
                     }
                 }
-                $this->__set($key, $value);
+                if ($key != static::primaryKey()) $this->__set($key, $value);
             }
         }
 
@@ -1080,6 +1074,7 @@ abstract class Som_Model_Abstract
                             $error = implode(', ', $validator->getMessages());
                             $this->_errors[$name][] = $error;
                         }
+
                     } elseif (is_callable($validator)) {
                         // Проверка на callback
                         try {
@@ -1090,6 +1085,7 @@ abstract class Som_Model_Abstract
                             throw new Exception("Не правильный CallBack validator для поля '{$name}'");
 
                         }
+
                     } elseif (is_string($validator)) {
                         switch (mb_strtolower($validator)) {
                             case 'required':
