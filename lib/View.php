@@ -257,6 +257,23 @@ class View{
         $t->out();
     }
 
+    public function template($script, $vars = array()) {
+        $view = new View();
+
+        if(!empty($this->_path)) {
+            foreach ($this->_path as $path) {
+                $view->addScriptPath($path);
+            }
+        }
+        foreach ($this->_vars as $key => $var) {
+            $view->$key = $var;
+        }
+        foreach($vars as $key => $var) {
+            $view->$key = $var;
+        }
+        return $view->render($script);
+    }
+
     /**
      * @param $viewFile имя файла шаблона. Если не указано расширение или оно не входит в $_extensions, будет использовано
      *              '.php'
