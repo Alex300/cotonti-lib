@@ -8,6 +8,15 @@
  * @author Mankov
  * @author Kalnov Alexey <kalnov_alexey@yandex.ru> http://portal30.ru
  * @version 1.3
+ *
+ *  @todo Models   Hooks for before/after insert, update, delete methods
+ *
+ *  @todo Models   use cot_build_extrafields_data and cot_parse
+ *                 В общем вывод в форму и на страницу нужно как то разделить
+ *                 Вероятно при выводе на страницу добавить эти функции в геттер
+ *                 А в форму ставить rawValue
+ *
+ * @todo Models    Фильтровать импорт через HTML purifier
  */
 class Som
 {
