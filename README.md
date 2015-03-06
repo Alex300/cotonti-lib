@@ -12,4 +12,6 @@ Includes:
 
 SOM - ORM system for Cotonti Siena: http://portal30.ru/sozdanie-internet-sajtov/free-scripts/cotonti-lib/som
 
-View - Templating library using a native php
+View - Templating library using a native php: http://portal30.ru/sozdanie-internet-sajtov/free-scripts/cotonti-lib/view
+
+Autoloader - Class files autoloader: http://portal30.ru/sozdanie-internet-sajtov/free-scripts/cotonti-lib/loader
