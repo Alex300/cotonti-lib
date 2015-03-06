@@ -8,7 +8,6 @@
  * @author Mankov
  * @author Kalnov Alexey <kalnov_alexey@yandex.ru> http://portal30.ru
  *
- * @todo    Hooks for before/after insert, update, delete methods
  */
 abstract class Som_Model_Abstract
 {
@@ -105,11 +104,15 @@ abstract class Som_Model_Abstract
 
             foreach($cot_extrafields[static::$_tbname] as $key => $field) {
                 if(!array_key_exists($field['field_type'], $dbAdapter::$extraTypesMap)) continue;
+                $desc = $field['field_description'];
+                if(isset(cot::$L[$className.'_'.$field['field_name'].'_title'])) {
+                    $desc = cot::$L[$className.'_'.$field['field_name'].'_title'];
+                }
                 $data = array(
                     'name'      => $column_prefix.$field['field_name'],
                     'type'      => $dbAdapter::$extraTypesMap[$field['field_type']],
 //                    'length'    => '64',
-                    'description' => $field['field_description'],
+                    'description' => $desc,
                     'nullable'  => ($field['field_required'] == 1) ? false : true,
                     'default'   => $field['field_default'],
                 );
@@ -771,7 +774,10 @@ abstract class Som_Model_Abstract
      * @param $column
      * @return string
      */
-    public function getFieldLabel($column) {
+    public static function getFieldLabel($column) {
+        $className = get_called_class();
+        if(isset(cot::$L[$className.'_'.$column.'_title'])) return cot::$L[$className.'_'.$column.'_title'];
+
         $fields = static::getFields();
         if (isset($fields[$column]['description'])) return $fields[$column]['description'];
 
@@ -1091,7 +1097,10 @@ abstract class Som_Model_Abstract
                             case 'required':
                                 $this->_requiredFields[$name] = 1;
                                 if (($value === '') || (is_null($value))) {
-                                    $error = 'Обязательное для заполнения';
+                                    $fieldName = $name;
+                                    $tmp = static::getFieldLabel($name);
+                                    if(!empty($tmp)) $fieldName = $tmp;
+                                    $error = (isset($L['field_required_'.$name])) ? $L['field_required_'.$name] : $L['field_required'].': '.$fieldName;
                                     $this->_errors[$name][] = $error;
                                 }
                                 break;
