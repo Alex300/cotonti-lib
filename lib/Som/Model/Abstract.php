@@ -1024,7 +1024,7 @@ abstract class Som_Model_Abstract
      * @throws Exception
      * @todo дописать метод
      */
-    public function validate($validateFields = null) {
+    public function validate($validateFields = null, $errorMessages = true) {
         $validators = $this->validators();
 
         $fields = static::getFields();
@@ -1100,7 +1100,8 @@ abstract class Som_Model_Abstract
                                     $fieldName = $name;
                                     $tmp = static::getFieldLabel($name);
                                     if(!empty($tmp)) $fieldName = $tmp;
-                                    $error = (isset($L['field_required_'.$name])) ? $L['field_required_'.$name] : $L['field_required'].': '.$fieldName;
+                                    $error = (isset(cot::$L['field_required_'.$name])) ? cot::$L['field_required_'.$name] :
+                                        cot::$L['field_required'].': '.$fieldName;
                                     $this->_errors[$name][] = $error;
                                 }
                                 break;
@@ -1121,6 +1122,17 @@ abstract class Som_Model_Abstract
 
                         break;
 
+                }
+            }
+        }
+
+        // Системные сообщения об ошибках
+        if(count($this->_errors) > 0 && $errorMessages) {
+            foreach($this->_errors as $name => $errors) {
+                if(!empty($errors)) {
+                    foreach($errors as $errorRow) {
+                        cot_error($errorRow, $name);
+                    }
                 }
             }
         }

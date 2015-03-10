@@ -17,8 +17,6 @@
  *                 А в форму ставить rawValue
  *
  * @todo Models    Фильтровать импорт через HTML purifier
- *
- * @todo Models    При валидации вызывать cot_error, если в парамерах не передано иное
  */
 class Som
 {
