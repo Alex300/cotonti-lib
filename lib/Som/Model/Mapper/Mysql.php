@@ -7,6 +7,40 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
 
     protected $tableQuote = '`';
 
+    /**
+     * Connect to Data Base
+     * @param $dbc
+     * @return PDO
+     */
+    protected static function connect($dbc) {
+        if (empty(Som_Model_Mapper_Abstract::$connections[$dbc])) {
+
+            // Connect to DB
+            if($dbc == 'db'){
+                // Default cotonti connection
+                Som_Model_Mapper_Abstract::$connections[$dbc] = cot::$db;
+            }else{
+                // Альтернативное соединение из конфига
+                $options = array();
+                if (!empty(cot::$cfg[$dbc]['charset'])) {
+                    $collation_query = "SET NAMES '".cot::$cfg[$dbc]['charset']."'";
+                    if (!empty(cot::$cfg[$dbc]['collate']) )  {
+                        $collation_query .= " COLLATE '".cot::$cfg[$dbc]['collate']."'";
+                    }
+                    $options[PDO::MYSQL_ATTR_INIT_COMMAND] = $collation_query;
+                }
+
+                $dbc_port = empty(cot::$cfg[$dbc]['port']) ? '' : ';port=' . cot::$cfg[$dbc]['port'];
+                $dsn = cot::$cfg[$dbc]['adapter'] . ':host=' . cot::$cfg[$dbc]['host'] . $dbc_port .
+                    ';dbname=' . cot::$cfg[$dbc]['dbname'];
+                Som_Model_Mapper_Abstract::$connections[$dbc] = new PDO($dsn, cot::$cfg[$dbc]['username'],
+                    cot::$cfg[$dbc]['password'], $options);
+            }
+        }
+
+        return Som_Model_Mapper_Abstract::$connections[$dbc];
+    }
+
 
     /**
      * Returns the column descriptions for a table.

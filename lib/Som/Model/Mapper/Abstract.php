@@ -4,7 +4,9 @@
  */
 abstract class Som_Model_Mapper_Abstract
 {
-
+    /**
+     * @var PDO[] connections registry
+     */
     protected static $connections = array();
 
     /**

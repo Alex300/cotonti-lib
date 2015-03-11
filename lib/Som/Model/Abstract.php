@@ -283,6 +283,11 @@ abstract class Som_Model_Abstract
                 case 'bool':
                     if(!is_null($val)) $val = (bool)$val;
                     break;
+
+                case 'varchar':
+                case 'text':
+                    $val = cot_import($val, 'DIRECT', 'HTM');
+                    break;
             }
             $this->_data[$name] = $val;
 
@@ -992,14 +997,13 @@ abstract class Som_Model_Abstract
      * @return $this
      * @todo проверка типов валидаторов
      */
-    public function setValidator($field, $validators)
-    {
-        if (!is_array($validators))
-            $validators = array($validators);
+    public function setValidator($field, $validators) {
+        if (!is_array($validators)) $validators = array($validators);
 
         foreach ($validators as $val) {
-            if (!in_array($val, $this->validators[$field]))
+            if (!isset($this->validators[$field]) || !in_array($val, $this->validators[$field])){
                 $this->validators[$field][] = $val;
+            }
         }
 
         return $this;
