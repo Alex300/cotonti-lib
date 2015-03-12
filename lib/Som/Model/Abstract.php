@@ -651,8 +651,8 @@ abstract class Som_Model_Abstract
     protected function beforeInsert(){ return true; }
 
     /**
-     * Создать объект
-     * @return int id Созданного объекта
+     * Create object
+     * @return int created object id
      */
     protected final function insert(){
         if($this->beforeInsert()){
@@ -673,7 +673,7 @@ abstract class Som_Model_Abstract
     protected function beforeUpdate(){ return true; }
 
     /**
-     * Обновить объект
+     * Update object
      */
     protected final function update(){
         $className = get_called_class();
@@ -708,13 +708,22 @@ abstract class Som_Model_Abstract
     protected function beforeDelete(){ return true; }
 
     /**
-     * @access public
+     * Delete object
      */
-    public function delete()
-    {
+    public function delete() {
         $className = get_called_class();
 
         if (!$this->validateDelete() || !$this->beforeDelete()) return false;
+
+        if(!empty($cot_extrafields[static::$_tbname])) {
+            // Не очень хорошее решение, но в Cotonti имена полей хранятся без префиска.
+            $column_prefix = substr(static::$_primary_key, 0, strpos(static::$_primary_key, "_"));
+            $column_prefix = (!empty($column_prefix)) ? $column_prefix . '_' : '';
+
+            foreach($cot_extrafields[static::$_tbname] as $key => $field) {
+                cot_extrafield_unlinkfiles($this->_data[$column_prefix.$field['field_name']], $field);
+            }
+        }
 
         static::$_db->delete($this);
         unset(self::$_stCache[$className][$this->getId()]);
