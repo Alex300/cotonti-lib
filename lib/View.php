@@ -301,7 +301,7 @@ class View{
             if(!in_array($viewFile[(count($viewFile) - 1)], $this->_extensions)){
                 $ext = '.php';
             }
-            throw new Exception("View script file not found: «".implode('.', $viewFile).$ext."»");
+            throw new Exception('View script file not found: "'.implode('.', $viewFile).$ext.'"');
         }
 
         if ($return) {
