@@ -884,7 +884,7 @@ abstract class Som_Model_Abstract
     public function rawValue($column){
         $fields = static::getFields();
 
-        if($fields[$column]['type'] == 'link' && in_array($fields[$column]['link']['relation'],
+        if(isset($fields[$column]) && $fields[$column]['type'] == 'link' && in_array($fields[$column]['link']['relation'],
                 array(Som::TO_MANY, Som::TO_MANY_NULL))) {
             if(isset($this->_linkData[$column])) return $this->_linkData[$column];
             return null;
