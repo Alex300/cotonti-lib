@@ -464,7 +464,10 @@ abstract class Som_Model_Abstract
                         throw new Exception("Trying to write value «{$value}» to protected field «{$key}» of model «{$class}»");
                     }
                 }
-                if ($key != static::primaryKey()) $this->__set($key, $value);
+                if ($key != static::primaryKey()) {
+                    if(is_string($value)) $value = trim($value);
+                    $this->__set($key, $value);
+                }
             }
         }
 
