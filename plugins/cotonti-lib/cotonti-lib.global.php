@@ -2,6 +2,7 @@
 /* ====================
 [BEGIN_COT_EXT]
 Hooks=global
+Order=4
 [END_COT_EXT]
 ==================== */
 /**
