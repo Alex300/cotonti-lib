@@ -223,12 +223,13 @@ class View{
      * Renders different messages on page
      *  wrapper for cot_display_messages()
      *
+     * @param bool $cache - "Просросить" сообщения об ошибках, чтобы подсвечивать элементы формы
      * @param string $tpl
      * @throws Exception
      * @return string
      * @see cot_display_messages()
      */
-    public function displayMessages($tpl = ''){
+    public function displayMessages($cache = true, $tpl = ''){
         if($tpl == ''){
             $tpl = cot::$cfg['themes_dir'].DIRECTORY_SEPARATOR.cot::$usr['theme'].DIRECTORY_SEPARATOR.'warnings.tpl';
             if(!file_exists($tpl)){
@@ -250,8 +251,10 @@ class View{
         cot_display_messages($t);
 
         // "Пробросим" сообщения об ошибках назад, чтобы скрипт вида мог подсвечивать элементы форм с ошибками
-        $_SESSION['cot_messages'][cot::$sys['site_id']] = $currentMessages;
-        $this->messagesDisplayed = true;
+        if($cache) {
+            $_SESSION['cot_messages'][cot::$sys['site_id']] = $currentMessages;
+            $this->messagesDisplayed = true;
+        }
 
         $t->parse();
         $t->out();
