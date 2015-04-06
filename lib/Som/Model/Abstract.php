@@ -151,7 +151,13 @@ abstract class Som_Model_Abstract
         // Заполняем существующие поля строго значениями из БД. Никаких сеттеров
         if (!is_null($data)) {
             foreach ($data as $key => $value) {
-                if (in_array($key, static::getColumns())) $this->_data[$key] = $value;
+                if (in_array($key, static::getColumns())) {
+                    $this->_data[$key] = $value;
+
+                } elseif(!isset($fields[$key])) {
+                    // Пробрасываем дополнительные значения
+                    $this->_extraData[$key] = $value;
+                }
             }
         }
 
