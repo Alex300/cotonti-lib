@@ -732,7 +732,7 @@ abstract class Som_Model_Mapper_Abstract
      * @return array SQL WHERE part and PDO params
      * @todo описание условий
      */
-    protected function parseConditions($conditions = array(), $params = array())
+    public function parseConditions($conditions = array(), $params = array())
     {
         $where = '';
 
@@ -848,7 +848,7 @@ abstract class Som_Model_Mapper_Abstract
      * @throws Exception
      * @return string
      */
-    protected function parseOrder($order)
+    public function parseOrder($order)
     {
 
         // Если передали строку
