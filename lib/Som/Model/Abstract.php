@@ -4,6 +4,9 @@
  * ORM System
  * SOM - Simple Object Manipulation
  *
+ * @package Cotonti Lib
+ * @subpackage SOM
+ *
  * @author Gert Hengeveld (ORM from cot-factory)
  * @author Mankov
  * @author Kalnov Alexey <kalnov_alexey@yandex.ru> http://portal30.ru
@@ -604,6 +607,43 @@ abstract class Som_Model_Abstract
         $res = $className::fetch($conditions, $limit, $offset, $order);
 
         return $res;
+    }
+
+    /**
+     * Retrieve a key => val list from the database.
+     * @param array $conditions
+     * @param int $limit
+     * @param int $offset
+     * @param string $order
+     * @param string $field
+     * @throws Exception
+     * @return array
+     */
+    public static function keyValPairs($conditions = array(), $limit = 0, $offset = 0, $order = '', $field = null) {
+
+        if(empty($field)) {
+            $fields = static::getFields();
+            if(array_key_exists('title', $fields)) $field = 'title';
+        }
+        if(empty($field)) {
+            throw new Exception('Field Name is missing');
+        }
+
+        if(empty($order)) $order = array(array($field, 'ASC'));
+
+        /** @var Som_Model_Abstract $className */
+        $className = get_called_class();
+
+        $items = $className::find($conditions, $limit, $offset, $order);
+        if(!$items) return array();
+
+        $ret = array();
+        foreach($items as $itemRow) {
+            $ret[$itemRow->getId()] = $itemRow->{$field};
+        }
+
+        //return $_stCache[$key];
+        return $ret;
     }
 
     /**
