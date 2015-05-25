@@ -82,6 +82,11 @@ class ListFilter
     public $activeFilters = array();
 
     /**
+     * @var string Отображение опции "Не имеет значения"
+     */
+    public $noMatter = null;
+
+    /**
      *
      * @param mixed $config the configuration for this element.
      * @param mixed $parent the direct parent of this element.
@@ -89,6 +94,8 @@ class ListFilter
      * @see configure
      */
     public function __construct($config = null) {
+        $this->noMatter = cot::$R['code_option_empty'];
+
         if(!empty($config)) $this->setConfig($config);
 
         $this->init();
@@ -319,9 +326,14 @@ class ListFilter
 
     protected function commonAttributes($field, $attributes = array()) {
 
+        if(empty($attributes)) $attributes = array();
+        foreach($attributes as $key => $val) {
+            if(in_array(mb_strtolower($key), array('type', 'element', 'nomatter'))) unset($attributes[$key]);
+        }
+
         if(isset($this->fields[$field]) && !empty($this->fields[$field])) {
             foreach($this->fields[$field] as $key => $val) {
-                if(in_array($key, array('data', 'type', 'element', 'no_matter'))) continue;
+                if(in_array(mb_strtolower($key), array('data', 'type', 'element', 'nomatter'))) continue;
 
                 $attributes[$key] = $val;
             }
@@ -359,6 +371,26 @@ class ListFilter
         $ret = cot_checklistbox($value, $elName, array_keys($data), array_values($data), $attributes, '', false);
 
         return $ret;
+    }
+
+    /**
+     * Возвращает фильтр "Like"
+     *
+     * @param string $field
+     * @param array $config
+     *
+     * @return string
+     */
+    public function like($field, $config = array()) {
+        $filter = 'like';
+        $elName = $this->getParam."[{$field}][{$filter}]";
+
+        $attributes = $this->commonAttributes($field, $config);
+
+        $value = '';
+        if(isset($this->filters[$field][$filter])) $value = $this->filters[$field][$filter];
+
+        return cot_inputbox('text', $elName, $value, $attributes);
     }
 
     /**
@@ -408,11 +440,11 @@ class ListFilter
 //        }
 
         if($element == 'select') {
-            $no_matter = cot::$R['code_option_empty'];
-            if(isset($config['no_matter'])) {
-                $no_matter = $config['no_matter'];
-            } elseif(isset($this->fields[$field]) && isset($this->fields[$field]['no_matter'])) {
-                $no_matter = $this->fields[$field]['no_matter'];
+            $no_matter = $this->noMatter;
+            if(isset($config['noMatter'])) {
+                $no_matter = $config['noMatter'];
+            } elseif(isset($this->fields[$field]) && isset($this->fields[$field]['noMatter'])) {
+                $no_matter = $this->fields[$field]['noMatter'];
             }
             $options = array('nullval' => $no_matter);
             if(!empty($data)) {
@@ -480,11 +512,11 @@ class ListFilter
             if(isset($this->fields[$field]) && !empty($this->fields[$field]['data'])) $data = $this->fields[$field]['data'];
         }
 
-        $no_matter = cot::$R['code_option_empty'];
-        if(isset($config['no_matter'])) {
-            $no_matter = $config['no_matter'];
-        } elseif(isset($this->fields[$field]) && isset($this->fields[$field]['no_matter'])) {
-            $no_matter = $this->fields[$field]['no_matter'];
+        $no_matter = $this->noMatter;
+        if(isset($config['noMatter'])) {
+            $no_matter = $config['noMatter'];
+        } elseif(isset($this->fields[$field]) && isset($this->fields[$field]['noMatter'])) {
+            $no_matter = $this->fields[$field]['noMatter'];
         }
         $options = array('nullval' => $no_matter);
         if(!empty($data)) {
