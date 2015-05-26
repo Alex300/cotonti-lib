@@ -148,6 +148,27 @@ class ListFilter
                 }
             }
 
+            if(isset($filtersArr[$field]['is'])) {
+                if ($filtersArr[$field]['is'] != '' && !is_null($filtersArr[$field]['is'])) {
+                    $filtersArr[$field]['is'] = $this->importValue($filtersArr[$field]['is'], $fieldType);
+                    $tmp = $this->genCondition($field, $filtersArr[$field]['is'], 'is');
+                    if (!empty($tmp)) $cond[] = $tmp;
+                }else {
+                    unset($filtersArr[$field]['is']);
+                }
+            }
+
+            if(isset($filtersArr[$field]['like'])) {
+                if ($filtersArr[$field]['like'] != '' && !is_null($filtersArr[$field]['like'])) {
+                    $filtersArr[$field]['like'] = $this->importValue($filtersArr[$field]['like'], $fieldType);
+                    $tmp = $this->genCondition($field, $filtersArr[$field]['like'], 'like');
+                    if (!empty($tmp)) $cond[] = $tmp;
+                }else {
+                    unset($filtersArr[$field]['like']);
+                }
+            }
+
+
             if(isset($filtersArr[$field]['more'])) {
                 if($fieldType == 'text') $fieldType = 'double'; // Только числовой тип
                 if ($filtersArr[$field]['more'] != '' && !is_null($filtersArr[$field]['more'])) {
@@ -211,6 +232,12 @@ class ListFilter
                 $this->active = true;
                 $this->activeFilters[] = $field;
                 return array($field, $val);
+                break;
+
+            case 'like':
+                $this->active = true;
+                $this->activeFilters[] = $field;
+                return array($field, '*'.$val.'*');
                 break;
 
             case 'is':
@@ -374,6 +401,32 @@ class ListFilter
     }
 
     /**
+     * Возвращает фильтр "Равно"
+     *
+     * @param string $field
+     * @param array $config
+     *
+     * @return string
+     *
+     * @todo обработка опции "element" (Тип элемента)
+     */
+    public function is($field, $config = array()) {
+        $filter = 'is';
+        $elName = $this->getParam."[{$field}][{$filter}]";
+
+        $element = '';
+        if(isset($config['element'])) $element = $config['element'];
+        if(empty($element)) {
+            if(isset($this->fields[$field]) && !empty($this->fields[$field]['element'])) $element = $this->fields[$field]['element'];
+        }
+        if(empty($element)) $element = 'text';
+
+        if(in_array($element, array('text', 'select', 'radio'))) return $this->$element($field, $config, $filter);
+
+        return $this->text($field, $config, $filter);
+    }
+
+    /**
      * Возвращает фильтр "Like"
      *
      * @param string $field
@@ -484,8 +537,7 @@ class ListFilter
         return $this->moreLess($field, $config, 'less');
     }
 
-    public function radio($field, $config = array()) {
-        $filter = 'radio';
+    public function radio($field, $config = array(), $filter = 'radio') {
         $elName = $this->getParam."[{$field}][{$filter}]";
 
         $data = array();
@@ -500,8 +552,7 @@ class ListFilter
         return cot_radiobox($value, $elName, array_keys($data), array_values($data));
     }
 
-    public function select($field, $config = array()) {
-        $filter = 'select';
+    public function select($field, $config = array(), $filter = 'select') {
         $elName = $this->getParam."[{$field}][{$filter}]";
 
         $attributes = $this->commonAttributes($field, $config);
@@ -531,4 +582,22 @@ class ListFilter
         return cot_selectbox($value, $elName, array_keys($options), array_values($options), false, $attributes);
     }
 
+    /**
+     * Возвращает фильтр input type="text"
+     *
+     * @param string $field
+     * @param array $config
+     *
+     * @return string
+     */
+    public function text($field, $config = array(), $filter = 'input') {
+        $elName = $this->getParam."[{$field}][{$filter}]";
+
+        $attributes = $this->commonAttributes($field, $config);
+
+        $value = '';
+        if(isset($this->filters[$field][$filter])) $value = $this->filters[$field][$filter];
+
+        return cot_inputbox('text', $elName, $value, $attributes);
+    }
 }
