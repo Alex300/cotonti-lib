@@ -1234,8 +1234,17 @@ abstract class Som_Model_Abstract
      * Get Table Name
      * @return string
      */
-    public static function getTableName(){
+    public static function tableName(){
         return static::$_tbname;
+    }
+
+    /**
+     * Get Table Name
+     * @deprecated
+     * @return string
+     */
+    public static function getTableName(){
+        return static::tableName();
     }
 
     /**
