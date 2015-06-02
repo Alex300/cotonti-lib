@@ -9,6 +9,8 @@
  */
 define('CLI', 1);
 ini_set('display_errors', 1);
+ini_set('xdebug.default_enable', 0);
+ini_set('xdebug.overload_var_dump', 0);
 
 // Let the include files know that we are Cotonti
 define('COT_CODE', true);
@@ -88,6 +90,7 @@ if($num = array_search('--a', $argv)) {
 
         // Load the requested extension
         if ($env['type'] == 'plug') {
+            $_GET['e'] = $e;
             require_once $cfg['system_dir'] . '/plugin.php';
 
         } else {
