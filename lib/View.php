@@ -231,9 +231,18 @@ class View{
      */
     public function displayMessages($cache = true, $tpl = ''){
         if($tpl == ''){
-            $tpl = cot::$cfg['themes_dir'].DIRECTORY_SEPARATOR.cot::$usr['theme'].DIRECTORY_SEPARATOR.'warnings.tpl';
-            if(!file_exists($tpl)){
-                $tpl = cot::$cfg['themes_dir'].DIRECTORY_SEPARATOR.cot::$cfg['defaulttheme'].DIRECTORY_SEPARATOR.'warnings.tpl';
+            if(defined('COT_ADMIN')) {
+                $tpl = cot::$cfg['system_dir'].DIRECTORY_SEPARATOR.'admin'.DIRECTORY_SEPARATOR.'tpl'.DIRECTORY_SEPARATOR.'warnings.tpl';
+                if(!empty(cot::$cfg['admintheme'])) {
+                    $file = cot::$cfg['themes_dir'].DIRECTORY_SEPARATOR.'admin'.DIRECTORY_SEPARATOR.cot::$cfg['admintheme'].
+                        DIRECTORY_SEPARATOR.'warnings.tpl';
+                    if(file_exists($file)) $tpl = $file;
+                }
+            } else {
+                $tpl = cot::$cfg['themes_dir'].DIRECTORY_SEPARATOR.cot::$usr['theme'].DIRECTORY_SEPARATOR.'warnings.tpl';
+                if(!file_exists($tpl)){
+                    $tpl = cot::$cfg['themes_dir'].DIRECTORY_SEPARATOR.cot::$cfg['defaulttheme'].DIRECTORY_SEPARATOR.'warnings.tpl';
+                }
             }
         }
         if(!file_exists($tpl)){
