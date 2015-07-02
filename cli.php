@@ -15,8 +15,13 @@ ini_set('xdebug.overload_var_dump', 0);
 // Let the include files know that we are Cotonti
 define('COT_CODE', true);
 
+// Site root folder
+define("DOC_ROOT", dirname(__FILE__) . '/');
+
+chdir(DOC_ROOT);
+
 // Load vital core configuration from file
-require_once './datas/config.php';
+require_once DOC_ROOT.'datas/config.php';
 
 $cfg['display_errors'] = true;
 
