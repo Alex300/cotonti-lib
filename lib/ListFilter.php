@@ -325,7 +325,7 @@ class ListFilter
             $this->modelFields = array();
             if(!empty($this->modelName)){
                 $modelName = $this->modelName;
-                $this->modelFields = $modelName::getFields();
+                $this->modelFields = $modelName::fields();
             }
         }
 
