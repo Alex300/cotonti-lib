@@ -140,7 +140,7 @@ abstract class Som_Model_Abstract
         $pkey = static::primaryKey();
 
         // Инициализация полей
-        $fields = static::getFields();
+        $fields = static::fields();
         foreach ($fields as $name => $field) {
             if (!isset($field['link']) ||
                 (in_array($field['link']['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL)) && !isset($field['link']['localKey'])) ){
@@ -185,7 +185,7 @@ abstract class Som_Model_Abstract
      * @return mixed
      */
     public function __set($name, $val) {
-        $fields = static::getFields();
+        $fields = static::fields();
 
         $link = false;
         // Проверка связей
@@ -320,7 +320,7 @@ abstract class Som_Model_Abstract
             return $this->$methodName();
         }
 
-        $fields = static::getFields();
+        $fields = static::fields();
 
         // Проверка на наличие связей
         if (isset($fields[$name]) && $fields[$name]['type'] == 'link') {
@@ -373,7 +373,7 @@ abstract class Som_Model_Abstract
             return $this->$methodName();
         }
 
-        $fields = static::getFields();
+        $fields = static::fields();
 
         // Проверка на наличие связей
         if (isset($fields[$column]) && $fields[$column]['type'] == 'link') {
@@ -415,7 +415,7 @@ abstract class Som_Model_Abstract
             return $this->$methodName();
         }
 
-        $fields = static::getFields();
+        $fields = static::fields();
 
         // Проверка на наличие связей
         if (isset($fields[$column]) && $fields[$column]['type'] == 'link') {
@@ -458,7 +458,7 @@ abstract class Som_Model_Abstract
      * @return bool
      */
     public function setData($data, $safe = true) {
-        $fields = static::getFields();
+        $fields = static::fields();
 
         if ($this->beforeSetData($data)) {
             $class = get_class($this);
@@ -622,7 +622,7 @@ abstract class Som_Model_Abstract
     public static function keyValPairs($conditions = array(), $limit = 0, $offset = 0, $order = '', $field = null) {
 
         if(empty($field)) {
-            $fields = static::getFields();
+            $fields = static::fields();
             if(array_key_exists('title', $fields)) $field = 'title';
         }
         if(empty($field)) {
@@ -837,14 +837,23 @@ abstract class Som_Model_Abstract
      * @param $column
      * @return string
      */
-    public static function getFieldLabel($column) {
+    public static function fieldLabel($column) {
         $className = get_called_class();
         if(isset(cot::$L[$className.'_'.$column.'_title'])) return cot::$L[$className.'_'.$column.'_title'];
 
-        $fields = static::getFields();
+        $fields = static::fields();
         if (isset($fields[$column]['description'])) return $fields[$column]['description'];
 
         return '';
+    }
+
+    /**
+     * @param $column
+     * @return string
+     * @deprecated
+     */
+    public static function getFieldLabel($column) {
+        return static::fieldLabel($column);
     }
 
     /**
@@ -855,7 +864,7 @@ abstract class Som_Model_Abstract
      *
      * @return array
      */
-    public static function getFields($real = false, $cache = true) {
+    public static function fields($real = false, $cache = true) {
         if ($real) return static::$_db->getFields(static::$_tbname);
 
         $className = get_called_class();
@@ -868,13 +877,22 @@ abstract class Som_Model_Abstract
     }
 
     /**
+     * @param $column
+     * @return string
+     * @deprecated
+     */
+    public static function getFields($real = false, $cache = true) {
+        return static::fields($real, $cache);
+    }
+
+    /**
      * Получить поле по названию или по связи
      *   если полей с заданной связью несколько - вернет первое
      * @param $params
      * @return null
      */
     public function getField($params) {
-        $fields = static::getFields();
+        $fields = static::fields();
 
         if (is_string($params)) return (!empty($fields[$params])) ? $fields[$params] : null;
         // Если передали объект, надо искать связь
@@ -911,7 +929,7 @@ abstract class Som_Model_Abstract
 
         if($cache && !empty($cols[$className]))  return $cols[$className];
 
-        $fields = static::getFields($real, $cache);
+        $fields = static::fields($real, $cache);
         // Не включаем связи ко многим и, также, указывающие на другое поле
         $cols[$className] = array();
         foreach ($fields as $name => $field) {
@@ -931,7 +949,7 @@ abstract class Som_Model_Abstract
      * @return mixed
      */
     public function rawValue($column){
-        $fields = static::getFields();
+        $fields = static::fields();
 
         if(isset($fields[$column]) && $fields[$column]['type'] == 'link' && in_array($fields[$column]['link']['relation'],
                 array(Som::TO_MANY, Som::TO_MANY_NULL))) {
@@ -964,7 +982,7 @@ abstract class Som_Model_Abstract
             }
         }
 
-        $fields = static::getFields();
+        $fields = static::fields();
         foreach ($fields as $name => $field) {
             if ($name !== static::$_primary_key) {
                 if (isset($field['nullable']) && !$field['nullable']) $requiredFields[] = $name;
@@ -1089,7 +1107,7 @@ abstract class Som_Model_Abstract
     public function validate($validateFields = null, $errorMessages = true) {
         $validators = $this->validators();
 
-        $fields = static::getFields();
+        $fields = static::fields();
 
         foreach($this->requiredFields() as $field){
             $validators[] = array($field, 'required');
@@ -1160,7 +1178,7 @@ abstract class Som_Model_Abstract
                                 $this->_requiredFields[$name] = 1;
                                 if (($value === '') || (is_null($value))) {
                                     $fieldName = $name;
-                                    $tmp = static::getFieldLabel($name);
+                                    $tmp = static::fieldLabel($name);
                                     if(!empty($tmp)) $fieldName = $tmp;
                                     $error = (isset(cot::$L['field_required_'.$name])) ? cot::$L['field_required_'.$name] :
                                         cot::$L['field_required'].': '.$fieldName;

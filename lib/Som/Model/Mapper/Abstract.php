@@ -427,7 +427,7 @@ abstract class Som_Model_Mapper_Abstract
 
             if ($id > 0 && !empty($model)) {
                 $data[$pkey] = $id;
-                $fields = $model::getFields();
+                $fields = $model::fields();
                 $model->{$pkey} = $id;
                 if (!empty($fields)) {
                     foreach ($fields as $fieldName => $field) {
@@ -494,7 +494,7 @@ abstract class Som_Model_Mapper_Abstract
 
         // Сохранить связи
         if (!empty($model)) {
-            $fields = $model::getFields();
+            $fields = $model::fields();
             if (!empty($fields)) {
                 foreach ($fields as $fieldName => $field) {
                     if (isset($field['link']) && in_array($field['link']['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
