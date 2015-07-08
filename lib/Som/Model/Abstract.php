@@ -278,7 +278,7 @@ abstract class Som_Model_Abstract
                 case 'mediumint':
                 case 'int':
                 case 'bigint':
-                    if(!( is_int($val) || ctype_digit($val) )) $val = null;
+                    if(!( is_numeric($val) && ($f = (float)$val) == (int)$f ))  $val = null;
                     break;
 
                 case 'float':
