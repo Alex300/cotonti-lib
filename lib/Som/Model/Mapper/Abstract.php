@@ -732,26 +732,41 @@ abstract class Som_Model_Mapper_Abstract
      * @return array SQL WHERE part and PDO params
      * @todo описание условий
      */
-    public function parseConditions($conditions = array(), $params = array())
-    {
-        $where = '';
+    public function parseConditions($conditions = array(), $params = array()) {
+        $joins    = array();
 
-        $table = $this->_dbinfo['tbname'];
+        if (empty($conditions)) return array('', array(), array());
+
+        $where = $this->parseCondition($conditions, $params, $joins);
+
+        if(!empty($where)) $where = 'WHERE '.$where;
+
+        return array($where, $params, $joins);
+    }
+
+    /**
+     * @param array $conditions
+     * @param array $params
+     * @param int   $i              counter
+     * @return null|string
+     * @throws Exception
+     */
+    protected function parseCondition(&$conditions, &$params, &$joins, $i = 0) {
         /** @var Som_Model_Abstract $class */
         $class = $this->_dbinfo['class'];
+        $table = $this->_dbinfo['tbname'];
+        if(empty($table) && !empty($class))  $table = $class::tableName();
         $tq = $this->tableQuote;
 
         $where = '';
         $orWhere = '';
         $joins   = array();
 
-        if(empty($conditions)) return array('', array(), array());
-
         if (!is_array($conditions)) $conditions = array($conditions);
         if (count($conditions) > 0) {
             $where = array();
             $orWhere = array();
-            $i = 0;
+
             foreach ($conditions as $condition) {
                 $i++;
                 if (is_array($condition)) {
@@ -764,58 +779,75 @@ abstract class Som_Model_Mapper_Abstract
                     $value = $condition[1];
                     $operand = $condition[2];
 
-                    $tblCol = "{$tq}$table{$tq}.{$tq}$column{$tq}";
-                    if (mb_strpos($column, '.') !== false) {
-                        $tmp = explode('.', $column);
-                        $tmp[0] = ($tmp[0] != '') ? $tmp[0] : $table;
-                        $tblCol = "{$tq}{$tmp[0]}{$tq}.{$tq}{$tmp[1]}{$tq}";
-                        $column = $tmp[1];
-                    }
+                    /**
+                     * Первый параметр  - массив. может содержать вложенные условия.
+                     * Например:
+                     * $condition[]=[
+                     *    [['desc', '*' . $kw . '*'],['text', '*' . $kw . '*', null, "OR"]]
+                     * ];
+                     */
+                    if (isset($condition[0]) && is_array($condition[0])) {
+                        $wh = $this->parseCondition($condition[0], $params, $joins, $i);
 
-
-                    // Если передали объект
-                    if ($condition[0] instanceof Som_Model_Abstract) {
-                        $fields = $class::fieldList();
-                        // todo дописать обработку полей
-                        if (empty($condition[1])) {
-                            // Не передали поле, ищем первое попавшиеся
-                            $fld = $class::getField($condition[0]);
-                            // todo exception
-                            if (empty($fld)) throw new Exception("В моделе '{$class}' нет связи с '" . get_class($condition[0]) . "'");
-                        } else {
-                            $fld = $class::getField($condition[1]);
-                            if (empty($fld)) {
-                                throw new Exception("В моделе '{$class}' поле '{$condition[1]}' не найдено");
-                            }
-                            if (!is_a($condition[0], $fld['model'])) {
-                                throw new Exception("В условии выборки переданный объект класса '" . get_class($condition[0]) . "' не
-                            соответствует модели '{$fld['model']}' связанной c полем '{$condition[1]}'");
-                            }
-                        }
-                        $value = (int)$condition[0]->getId();
-                        $column = $fld['name'];
-                    }
-
-                    if ($column == 'RAW' || $column == 'SQL') {
-                        $wh = $value ? $value : '';
-                    } elseif (is_array($value)) {
-                        $wh = ($value ? ($tblCol . ($operand == '<>' ? ' NOT' : '') . ' IN (' . implode(',', self::quote($value)) . ')') : '0');
-                    } elseif ($value === null) {
-                        $wh = ("{$tblCol} IS " . ($operand == '<>' ? 'NOT ' : '') . 'NULL');
                     } else {
-                        if (strpos($value, '*') !== false) {
-                            $wh = "$tblCol LIKE :$column" . $i;
-                            $params[$column . $i] = str_replace('*', '%', $value);
+                        $tblCol = (!empty($table)) ? static::quoteIdentifier($table) . '.' . static::quoteIdentifier($column) :
+                            static::quoteIdentifier($column);
+
+                        if (mb_strpos($column, '.') !== false) {
+                            $tmp = explode('.', $column);
+                            $tmp[0] = ($tmp[0] != '') ? $tmp[0] : $table;
+                            $tblCol = (!empty($tmp[0])) ? static::quoteIdentifier($tmp[0]) . '.' . static::quoteIdentifier($tmp[1]) :
+                                static::quoteIdentifier($tmp[1]);
+                            $column = $tmp[1];
+                        }
+
+
+                        // Если передали объект
+                        if ($condition[0] instanceof Som_Model_Abstract) {
+                            $fields = $class::fieldList();
+                            // todo дописать обработку полей
+                            if (empty($condition[1])) {
+                                // Не передали поле, ищем первое попавшиеся
+                                $fld = $class::field($condition[0]);
+                                // todo exception
+                                if (empty($fld)) throw new Exception("В моделе '{$class}' нет связи с '" . get_class($condition[0]) . "'");
+                            } else {
+                                $fld = $class::field($condition[1]);
+                                if (empty($fld)) {
+                                    throw new Exception("В моделе '{$class}' поле '{$condition[1]}' не найдено");
+                                }
+                                if (!is_a($condition[0], $fld['model'])) {
+                                    throw new Exception("В условии выборки переданный объект класса '" . get_class($condition[0]) . "' не
+                                соответствует модели '{$fld['model']}' связанной c полем '{$condition[1]}'");
+                                }
+                            }
+                            $value = (int)$condition[0]->getId();
+                            $column = $fld['name'];
+                        }
+
+                        if ($column == 'RAW' || $column == 'SQL') {
+                            $wh = $value ? $value : '';
+                        } elseif (is_array($value)) {
+                            $wh = ($value ? ($tblCol . ($operand == '<>' ? ' NOT' : '') . ' IN (' . implode(',', self::quote($value)) . ')') : '0');
+                        } elseif ($value === null) {
+                            $wh = ("{$tblCol} IS " . ($operand == '<>' ? 'NOT ' : '') . 'NULL');
                         } else {
-                            $wh = $tblCol . ' ' . $operand . ' :' . $column . $i;
-                            $params[$column . $i] = $value;
+                            if (strpos($value, '*') !== false) {
+                                $wh = "$tblCol LIKE :$column" . $i;
+                                $params[$column . $i] = str_replace('*', '%', $value);
+                            } else {
+                                $wh = $tblCol . ' ' . $operand . ' :' . $column . $i;
+                                $params[$column . $i] = $value;
+                            }
                         }
                     }
+
                     if ($condition[3] != 'OR') {
                         $where[] = $wh;
                     } else {
                         $orWhere[] = $wh;
                     }
+
                 } else {
                     // Парсим строковые условия
                     $parts = array();
@@ -825,8 +857,11 @@ abstract class Som_Model_Mapper_Abstract
                     $operator = trim($parts[2][0]);
                     $value = trim(trim($parts[3][0]), '\'"`');
                     if ($column && $operator) {
-                        $where[] = "{$tq}$table{$tq}.{$tq}$column{$tq} $operator :$column";
-                        //if (intval($value) == $value) $value = intval($value);    // не работает. Даже для строк дает true
+                        $sql = (!empty($table)) ? static::quoteIdentifier($table).'.'.static::quoteIdentifier($column) :
+                            static::quoteIdentifier($column);
+
+                        $where[] = "$sql $operator :$column";
+
                         if ((intval($value) == $value) && (strval(intval($value)) == $value)) $value = intval($value);
                         $params[$column] = $value;
                     } else {
@@ -836,10 +871,17 @@ abstract class Som_Model_Mapper_Abstract
                     }
                 }
             }
-            $where = 'WHERE (' . implode(') AND (', $where) . ')';
+
+            if (!empty($where)) {
+                $where = '(' . implode(') AND (', $where) . ')';
+
+            } elseif (count($orWhere) > 0) {
+                $where = '(' . $orWhere[0] . ')';
+                unset ($orWhere[0]);
+            }
             if (count($orWhere) > 0) $where .= ' OR (' . implode(') OR (', $orWhere) . ")";
         }
-        return array($where, $params, $joins);
+        return $where;
     }
 
     /**

@@ -891,7 +891,7 @@ abstract class Som_Model_Abstract
      * @param $params
      * @return null
      */
-    public function getField($params) {
+    public static function field($params) {
         $fields = static::fields();
 
         if (is_string($params)) return (!empty($fields[$params])) ? $fields[$params] : null;
