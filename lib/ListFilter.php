@@ -136,8 +136,6 @@ class ListFilter
             $fieldType = $this->fieldType($field);
             if(empty($fieldType)) $fieldType = 'text';    // По умолчанию
 
-            //var_dump($_GET, $filter);
-
             if(isset($filtersArr[$field]['checklistbox'])) {
                 if (is_array($filtersArr[$field]['checklistbox']) && !empty($filtersArr[$field]['checklistbox'])) {
                     $fData = array();
@@ -201,10 +199,18 @@ class ListFilter
                 }
             }
 
+            if(isset($filtersArr[$field]['radio'])) {
+                if ($filtersArr[$field]['radio'] != '' && !is_null($filtersArr[$field]['radio'])) {
+                    $fData = array();
+                    $tmp = $this->genCondition($field, $filtersArr[$field]['radio'], 'is');
+                    if (!empty($tmp)) $cond[] = $tmp;
+                }else {
+                    unset($filtersArr[$field]['radio']);
+                }
+            }
+
 
         }
-
-//        var_dump_($this->allowedFields);
 
         $this->filters = $filtersArr;
 
@@ -407,8 +413,6 @@ class ListFilter
      * @param array $config
      *
      * @return string
-     *
-     * @todo обработка опции "element" (Тип элемента)
      */
     public function is($field, $config = array()) {
         $filter = 'is';
@@ -493,20 +497,8 @@ class ListFilter
 //        }
 
         if($element == 'select') {
-            $no_matter = $this->noMatter;
-            if(isset($config['noMatter'])) {
-                $no_matter = $config['noMatter'];
-            } elseif(isset($this->fields[$field]) && isset($this->fields[$field]['noMatter'])) {
-                $no_matter = $this->fields[$field]['noMatter'];
-            }
-            $options = array('nullval' => $no_matter);
-            if(!empty($data)) {
-                foreach($data as $key => $val) {
-                    $options[$key] = $val;
-                }
-            }
+            return $this->select($field, $config, $filter);
 
-            $ret = cot_selectbox($value, $elName, array_keys($options), array_values($options), false, $attributes);
         } else {
             $ret = cot_inputbox('text', $elName, $value, $attributes);
         }
@@ -552,7 +544,19 @@ class ListFilter
         return cot_radiobox($value, $elName, array_keys($data), array_values($data));
     }
 
-    public function select($field, $config = array(), $filter = 'select') {
+    /**
+     * Возвращает фильтр "Выпадающий список"
+     *
+     * Самостоятельно этот фильтр не обрабатывается
+     * Используйте так:
+     * $filter->is('field_name', array('element' => 'select'))
+     *
+     * @param $field
+     * @param array $config
+     * @param string $filter
+     * @return string
+     */
+    protected function select($field, $config = array(), $filter = 'select') {
         $elName = $this->getParam."[{$field}][{$filter}]";
 
         $attributes = $this->commonAttributes($field, $config);
@@ -585,12 +589,16 @@ class ListFilter
     /**
      * Возвращает фильтр input type="text"
      *
+     * Самостоятельно этот фильтр не обрабатывается
+     * Используйте так:
+     * $filter->is('field_name', array('element' => 'input'))
+     *
      * @param string $field
      * @param array $config
      *
      * @return string
      */
-    public function text($field, $config = array(), $filter = 'input') {
+    protected function text($field, $config = array(), $filter = 'input') {
         $elName = $this->getParam."[{$field}][{$filter}]";
 
         $attributes = $this->commonAttributes($field, $config);
