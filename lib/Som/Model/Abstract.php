@@ -871,7 +871,10 @@ abstract class Som_Model_Abstract
 
         if($cache && !empty(self::$fields[$className])) return self::$fields[$className];
 
-        self::$fields[$className] = array_merge(static::fieldList(), self::$_extraFields[$className]);
+        $extFields = array();
+        if(!empty(self::$_extraFields[$className])) $extFields = self::$_extraFields[$className];
+
+        self::$fields[$className] = array_merge(static::fieldList(), $extFields);
 
         return self::$fields[$className];
     }
