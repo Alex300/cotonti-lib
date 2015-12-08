@@ -1080,13 +1080,18 @@ abstract class Som_Model_Mapper_Abstract
      * @throws Exception
      */
     public function saveRelations($table, $rTable, $id, $data, $fieldName = '',  $pkey = 'id', $rPkey = 'id') {
+        global $db_x;
         $tq = $this->tableQuote;
 
-        $priKey = mb_strtolower($table . '_' . $pkey);
+        // Убираем префиксы имен таблиц
+        $table  = preg_replace("/^$db_x/iu", '', $table);
+        $rTable = preg_replace("/^$db_x/iu", '', $rTable);
+
+        $priKey  = mb_strtolower($table . '_' . $pkey);
         $rPriKey = mb_strtolower($rTable . '_' . $rPkey);
 
-        $xRefTableName1 = mb_strtolower("{$table}_link_{$rTable}");
-        $xRefTableName2 = mb_strtolower("{$rTable}_link_{$table}");
+        $xRefTableName1 = $db_x.mb_strtolower("{$table}_link_{$rTable}");
+        $xRefTableName2 = $db_x.mb_strtolower("{$rTable}_link_{$table}");
 
         $xRefTable = false;
         if ($this->tableExists($xRefTableName1)) {
