@@ -1042,8 +1042,6 @@ abstract class Som_Model_Mapper_Abstract
      */
     protected function saveXRef($xModel, $id, $data, $fieldName = '')
     {
-        $tq = $this->tableQuote;
-
         if (is_string($xModel) || ($xModel instanceof Som_Model_Abstract)) {
             /** @var Som_Model_Abstract $xModel */
             $xPk = $xModel::primaryKey();
@@ -1053,15 +1051,34 @@ abstract class Som_Model_Mapper_Abstract
         }else{
             return false;
         }
-        $xPKey = mb_strtolower($xTableName . '_' . $xPk);
 
         $tableName = $this->_dbinfo['tbname'];
         $pk = $this->_dbinfo['pkey'];
-        $pKey = mb_strtolower($tableName . '_' . $pk);
 
+        return $this->saveRelations($tableName, $xTableName, $pk, $xPk, $id, $data, $fieldName);
+    }
 
-        $xRefTableName1 = mb_strtolower("{$tableName}_link_{$xTableName}");
-        $xRefTableName2 = mb_strtolower("{$xTableName}_link_{$tableName}");
+    /**
+     * Сохранить связи между таблицами
+     *
+     * @param $table
+     * @param $rTable
+     * @param $pkey
+     * @param $rPkey
+     * @param $id
+     * @param $data
+     * @param $fieldName
+     * @return bool
+     * @throws Exception
+     */
+    public function saveRelations($table, $rTable, $pkey, $rPkey, $id, $data, $fieldName = '') {
+        $tq = $this->tableQuote;
+
+        $priKey = mb_strtolower($table . '_' . $pkey);
+        $rPriKey = mb_strtolower($rTable . '_' . $rPkey);
+
+        $xRefTableName1 = mb_strtolower("{$table}_link_{$rTable}");
+        $xRefTableName2 = mb_strtolower("{$rTable}_link_{$table}");
 
         $xRefTable = false;
         if ($this->tableExists($xRefTableName1)) {
@@ -1078,14 +1095,14 @@ abstract class Som_Model_Mapper_Abstract
                         'type' => 'int',
                         'primary' => true,
                     ),
-                $pKey =>
+                $priKey =>
                     array(
-                        'name' => $pKey,
+                        'name' => $priKey,
                         'type' => 'int',
                     ),
-                $xPKey =>
+                $rPriKey =>
                     array(
-                        'name' => $xPKey,
+                        'name' => $rPriKey,
                         'type' => 'int',
                     ),
                 'name' =>
@@ -1097,7 +1114,9 @@ abstract class Som_Model_Mapper_Abstract
         }
 
         // Сохраняем связи
-        $query = "SELECT {$tq}{$xPKey}{$tq} FROM $xRefTable WHERE {$pKey}=$id AND {$tq}name{$tq}='{$fieldName}'";
+        $query = "SELECT ".$this->quoteIdentifier($rPriKey)." FROM $xRefTable WHERE ".$this->quoteIdentifier($priKey).
+            "={$id} AND ".$this->quoteIdentifier('name')."='{$fieldName}'";
+
         $old_xRefs = $this->query($query)->fetchAll(PDO::FETCH_COLUMN);
 
         if (!$old_xRefs) $old_xRefs = array();
@@ -1108,9 +1127,8 @@ abstract class Som_Model_Mapper_Abstract
         $cnt = 0;
         $isstr = false;
 
-        if ($data)
+        if (!empty($data)) {
             foreach ($data as $item) {
-                //            if (!is_int($item)) $isstr = true;
                 $p = array_search($item, $old_xRefs);
                 if ($p !== false) {
                     $kept_xRefs[] = $old_xRefs[$p];
@@ -1119,18 +1137,19 @@ abstract class Som_Model_Mapper_Abstract
                     $new_xRefs[] = $item;
                 }
             }
+        }
         // Remove old links that have been removed
         $rem_xRefs = array_diff($old_xRefs, $kept_xRefs);
         if (count($rem_xRefs) > 0) {
             $inCond = "(" . implode(",", $rem_xRefs) . ")";
-            $this->delete($xRefTable, "{$pKey}=$id AND {$xPKey} IN $inCond AND {$tq}name{$tq}='{$fieldName}'");
+            $this->delete($xRefTable, "{$priKey}=$id AND {$rPriKey} IN $inCond AND ".$this->quoteIdentifier('name')."='{$fieldName}'");
         }
         // Add new xRefs
         foreach ($new_xRefs as $item) {
             if ((!$isstr && $item > 0) || ($isstr && $item != '')) {
                 $upData = array(
-                    $pKey => $id,
-                    $xPKey => $item,
+                    $priKey => $id,
+                    $rPriKey => $item,
                     'name' => $fieldName
                 );
                 $res = $this->insert($xRefTable, $upData);
@@ -1142,7 +1161,6 @@ abstract class Som_Model_Mapper_Abstract
         }
 
         return true;
-
     }
 
     /**
