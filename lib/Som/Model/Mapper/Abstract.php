@@ -85,6 +85,14 @@ abstract class Som_Model_Mapper_Abstract
     }
 
     /**
+     * Закрываем соединение с БД
+     * @param $dbc
+     */
+    public static function closeConnect($dbc){
+        unset(self::$connections[$dbc]);
+    }
+
+    /**
      * Получить существующие таблиуы
      *  Например: SHOW TABLES для MySql
      * @param string $schema
@@ -1055,7 +1063,7 @@ abstract class Som_Model_Mapper_Abstract
         $tableName = $this->_dbinfo['tbname'];
         $pk = $this->_dbinfo['pkey'];
 
-        return $this->saveRelations($tableName, $xTableName, $pk, $xPk, $id, $data, $fieldName);
+        return $this->saveRelations($tableName, $xTableName, $id, $data, $fieldName, $pk, $xPk);
     }
 
     /**
@@ -1071,7 +1079,7 @@ abstract class Som_Model_Mapper_Abstract
      * @return bool
      * @throws Exception
      */
-    public function saveRelations($table, $rTable, $pkey, $rPkey, $id, $data, $fieldName = '') {
+    public function saveRelations($table, $rTable, $id, $data, $fieldName = '',  $pkey = 'id', $rPkey = 'id') {
         $tq = $this->tableQuote;
 
         $priKey = mb_strtolower($table . '_' . $pkey);
