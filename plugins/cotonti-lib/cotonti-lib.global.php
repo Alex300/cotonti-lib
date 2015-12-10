@@ -9,8 +9,8 @@ Order=4
  * Cotonti Lib plugin for Cotonti
  *
  * @package Cotonti Lib
- * @author Alex
- * @copyright Portal30 2014 http://portal30.ru
+ * @author  Kalnov Alexey    <kalnovalexey@yandex.ru>
+ * @copyright © Portal30 Studio http://portal30.ru
  */
 defined('COT_CODE') or die('Wrong URL.');
 
@@ -18,79 +18,26 @@ defined('COT_CODE') or die('Wrong URL.');
 require_once 'lib/Loader.php';
 Loader::register();
 
+/**
+ * Standard var_dump with <pre>
+ *
+ * @param mixed $var[,$var1],[.. varN]
+ */
+function var_dump_() {
+    echo '<div style="z-index:1000;opacity:0.8"><pre style="color:black;background-color:white;">';
+    $params = func_get_args();
+    call_user_func_array('var_dump', $params);
+    echo '</pre></div>';
+    ob_flush();
+}
 
-if(version_compare($cfg['version'], '0.9.17') == -1) {
-    // from Cotonti  v.0.9.17 cot_user_full_name() AND cot_user_data() are in core.
-
-    if (!function_exists('cot_user_full_name')) {
-        /**
-         * user display name
-         * @param array|int $user User Data or User ID
-         * @return array
-         */
-        function cot_user_full_name($user)
-        {
-
-            if (is_int($user) || ctype_digit($user)) $user = cot_user_data($user);
-            if (empty($user)) return '';
-
-            if (!empty($user['user_firstname']) || !empty($user['user_lastname']) || !empty($user['user_middlename'])) {
-                return trim($user['user_lastname'] . ' ' . $user['user_firstname'] . ' ' . $user['user_middlename']);
-            }
-
-            if (!empty($user['user_first_name']) || !empty($user['user_last_name']) || !empty($user['user_middle_name'])) {
-                return trim($user['user_last_name'] . ' ' . $user['user_first_name'] . ' ' . $user['user_middle_name']);
-            }
-
-            return $user['user_name'];
-        }
-    }
-
-    if (!function_exists('cot_user_data')) {
-        /**
-         * Fetches user entry from DB
-         *
-         * @param int $uid User ID
-         * @param bool $cacheitem
-         * @return array
-         */
-        function cot_user_data($uid = 0, $cacheitem = true)
-        {
-            global $db_users;
-
-            $user = false;
-
-            if (!$uid && cot::$usr['id'] > 0) {
-                $uid = cot::$usr['id'];
-                $user = cot::$usr['profile'];
-            }
-            if (!$uid) return null;
-
-            static $u_cache = array();
-
-            if ($cacheitem && isset($u_cache[$uid])) {
-                return $u_cache[$uid];
-            }
-
-            if (!$user) {
-                if (is_array($uid)) {
-                    $user = $uid;
-                    $uid = $user['user_id'];
-                } else {
-                    if ($uid > 0 && $uid == cot::$usr['id']) {
-                        $user = cot::$usr['profile'];
-                    } else {
-                        $uid = (int)$uid;
-                        if (!$uid) return null;
-                        $sql = cot::$db->query("SELECT * FROM $db_users WHERE user_id = ? LIMIT 1", $uid);
-                        $user = $sql->fetch();
-                    }
-                }
-            }
-
-            $cacheitem && $u_cache[$uid] = $user;
-
-            return $user;
-        }
-    }
+/**
+ * Standard var_dump with <pre> and exit
+ *
+ * @param mixed $var[,$var1],[.. varN]
+ */
+function var_dump__() {
+    $params = func_get_args();
+    call_user_func_array('var_dump_', $params);
+    exit;
 }
