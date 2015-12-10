@@ -1080,13 +1080,18 @@ abstract class Som_Model_Mapper_Abstract
      * @throws Exception
      */
     public function saveRelations($table, $rTable, $id, $data, $fieldName = '',  $pkey = 'id', $rPkey = 'id') {
+        global $db_x;
         $tq = $this->tableQuote;
 
-        $priKey = mb_strtolower($table . '_' . $pkey);
+        // Убираем префиксы имен таблиц
+        $table  = preg_replace("/^$db_x/iu", '', $table);
+        $rTable = preg_replace("/^$db_x/iu", '', $rTable);
+
+        $priKey  = mb_strtolower($table . '_' . $pkey);
         $rPriKey = mb_strtolower($rTable . '_' . $rPkey);
 
-        $xRefTableName1 = mb_strtolower("{$table}_link_{$rTable}");
-        $xRefTableName2 = mb_strtolower("{$rTable}_link_{$table}");
+        $xRefTableName1 = $db_x.mb_strtolower("{$table}_link_{$rTable}");
+        $xRefTableName2 = $db_x.mb_strtolower("{$rTable}_link_{$table}");
 
         $xRefTable = false;
         if ($this->tableExists($xRefTableName1)) {
@@ -1123,7 +1128,7 @@ abstract class Som_Model_Mapper_Abstract
 
         // Сохраняем связи
         $query = "SELECT ".$this->quoteIdentifier($rPriKey)." FROM $xRefTable WHERE ".$this->quoteIdentifier($priKey).
-            "={$id} AND ".$this->quoteIdentifier('name')."='{$fieldName}'";
+            "={$id} AND ".$this->quoteIdentifier('name')."=".$this->quote($fieldName);
 
         $old_xRefs = $this->query($query)->fetchAll(PDO::FETCH_COLUMN);
 
@@ -1150,7 +1155,7 @@ abstract class Som_Model_Mapper_Abstract
         $rem_xRefs = array_diff($old_xRefs, $kept_xRefs);
         if (count($rem_xRefs) > 0) {
             $inCond = "(" . implode(",", $rem_xRefs) . ")";
-            $this->delete($xRefTable, "{$priKey}=$id AND {$rPriKey} IN $inCond AND ".$this->quoteIdentifier('name')."='{$fieldName}'");
+            $this->delete($xRefTable, "{$priKey}=$id AND {$rPriKey} IN $inCond AND ".$this->quoteIdentifier('name')."=".$this->quote($fieldName));
         }
         // Add new xRefs
         foreach ($new_xRefs as $item) {
@@ -1172,7 +1177,8 @@ abstract class Som_Model_Mapper_Abstract
     }
 
     /**
-     * Удалить связи
+     * Удалить связи между моделями
+     *
      * @param string|Som_Model_Abstract $xModel
      * @param $id
      * @param string $fieldName
@@ -1180,35 +1186,53 @@ abstract class Som_Model_Mapper_Abstract
      */
     protected function deleteXRef($xModel, $id, $fieldName = '')
     {
-        $tq = $this->tableQuote;
-
         if (is_string($xModel) || ($xModel instanceof Som_Model_Abstract)) {
             /** @var Som_Model_Abstract $xModel */
-            $xPk = $xModel::primaryKey();
-            $linkModelDbInfo = $xModel::getDbConfig();
-
-            $xTableName = $linkModelDbInfo['tbname'];
+            $xPk        = $xModel::primaryKey();
+            $xTableName = $xModel::tableName();
         }else{
             return false;
         }
-        $xPKey = mb_strtolower($xTableName . '_' . $xPk);
+        $tableName  = $this->_dbinfo['tbname'];
+        $pk         = $this->_dbinfo['pkey'];
 
-        $tableName = $this->_dbinfo['tbname'];
-        $pk = $this->_dbinfo['pkey'];
-        $pKey = mb_strtolower($tableName . '_' . $pk);
-
-        $xRefTableName1 = mb_strtolower("{$tableName}_link_{$xTableName}");
-        $xRefTableName2 = mb_strtolower("{$xTableName}_link_{$tableName}");
-
-        if ($this->tableExists($xRefTableName1)) {
-            $this->delete($xRefTableName1, "{$pKey}=$id AND {$tq}name{$tq}='{$fieldName}'");
-        }
-        if ($this->tableExists($xRefTableName2)) {
-            $this->delete($xRefTableName2, "{$pKey}=$id AND {$tq}name{$tq}='{$fieldName}'");
-        }
+        $this->deleteRelations($tableName, $xTableName, $id, $fieldName, $pk, $xPk);
     }
 
     /**
+     * Удалить связи между таблицами
+     *
+     * @param string $table
+     * @param string $rTable        Связь с этой таблицей будет удалена
+     * @param int    $id            Значение первичного ключа из $table
+     * @param string $fieldName
+     * @param string $pkey
+     * @param string $rPkey
+     * @throws Exception
+     */
+    public function deleteRelations($table, $rTable, $id, $fieldName = '',  $pkey = 'id', $rPkey = 'id')
+    {
+        global $db_x;
+
+        // Убираем префиксы имен таблиц
+        $table = preg_replace("/^$db_x/iu", '', $table);
+        $rTable = preg_replace("/^$db_x/iu", '', $rTable);
+
+        $priKey = mb_strtolower($table . '_' . $pkey);
+        $rPriKey = mb_strtolower($rTable . '_' . $rPkey);
+
+        $xRefTableName1 = $db_x . mb_strtolower("{$table}_link_{$rTable}");
+        $xRefTableName2 = $db_x . mb_strtolower("{$rTable}_link_{$table}");
+
+        if ($this->tableExists($xRefTableName1)) {
+            $this->delete($xRefTableName1, "{$priKey}=$id AND ".$this->quoteIdentifier('name')."=".$this->quote($fieldName));
+        }
+        if ($this->tableExists($xRefTableName2)) {
+            $this->delete($xRefTableName2, "{$priKey}=$id AND ".$this->quoteIdentifier('name')."=".$this->quote($fieldName));
+        }
+    }
+
+        /**
      * Parses PDO exception message and returns its components and status
      *
      * @param PDOException $e PDO Exception
