@@ -9,7 +9,7 @@ defined('COT_CODE') or die('Wrong URL.');
  * @author  Kalnov Alexey    <kalnovalexey@yandex.ru>
  * @copyright © Portal30 Studio http://portal30.ru
  */
-class lib_controller_User
+class cotontilib_controller_User
 {
 
     /**

@@ -1,7 +1,7 @@
 <?php
 /* ====================
 [BEGIN_COT_EXT]
-Code=lib
+Code=cotontilib
 Name=Cotonti Lib
 Description=Additional API for extensions and themes
 Version=1.5.0
