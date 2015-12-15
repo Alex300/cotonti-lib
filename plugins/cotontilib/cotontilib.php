@@ -14,8 +14,9 @@ Hooks=standalone
  */
 defined('COT_CODE') or die('Wrong URL.');
 
-list($usr['auth_read'], $usr['auth_write'], $usr['isadmin']) = cot_auth('plug', cot::$env['ext'], 'RWA');
-cot_block($usr['isadmin']);
+// Права и так проверяются в system/plugin.php
+//list($usr['auth_read'], $usr['auth_write'], $usr['isadmin']) = cot_auth('plug', cot::$env['ext'], 'RWA');
+//cot_block($usr['auth_read']);
 
 // Self requirements
 //require_once cot_incfile(cot::$env['ext'], 'plug');
