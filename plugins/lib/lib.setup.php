@@ -1,13 +1,13 @@
 <?php
 /* ====================
 [BEGIN_COT_EXT]
-Code=cotonti-lib
+Code=lib
 Name=Cotonti Lib
 Description=Additional API for extensions and themes
-Version=1.0.0
-Date=2014-07-11
-Author=Alex
-Copyright=2014 Portal30 http://portal30.ru
+Version=1.5.0
+Date=2015-12-15
+Author=Kalnov Alexey
+Copyright=2014-2016 Portal30 http://portal30.ru
 Notes=
 Auth_guests=R
 Lock_guests=W12345A
@@ -20,10 +20,10 @@ Lock_members=W12345A
 ==================== */
 
 /**
- * Region City plugin for Cotonti
+ *  Cotonti Lib plugin for Cotonti Siena
  *
  * @package Cotonti Lib
- * @author Alex
- * @copyright Portal30 2014 http://portal30.ru
+ * @author  Kalnov Alexey    <kalnovalexey@yandex.ru>
+ * @copyright © 2014-2016 Portal30 Studio http://portal30.ru
  */
 defined('COT_CODE') or die('Wrong URL.');
