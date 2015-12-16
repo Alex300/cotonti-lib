@@ -1003,6 +1003,8 @@ abstract class Som_Model_Mapper_Abstract
      */
     public function loadXRef($xModel, $id, $fieldName = '')
     {
+        global $db_x;
+
         $tq = $this->tableQuote;
 
         if (is_string($xModel) || ($xModel instanceof Som_Model_Abstract)) {
@@ -1014,14 +1016,19 @@ abstract class Som_Model_Mapper_Abstract
         }else{
             return false;
         }
-        $xPKey = mb_strtolower($xTableName . '_' . $xPk);
 
         $tableName = $this->_dbinfo['tbname'];
-        $pk = $this->_dbinfo['pkey'];
-        $pKey = mb_strtolower($tableName . '_' . $pk);
 
-        $xRefTableName1 = mb_strtolower("{$tableName}_link_{$xTableName}");
-        $xRefTableName2 = mb_strtolower("{$xTableName}_link_{$tableName}");
+        // Убираем префиксы имен таблиц
+        $tableName  = preg_replace("/^$db_x/iu", '', $tableName);
+        $xTableName = preg_replace("/^$db_x/iu", '', $xTableName);
+
+        $pk = $this->_dbinfo['pkey'];
+        $pKey  = mb_strtolower($tableName . '_' . $pk);
+        $xPKey = mb_strtolower($xTableName . '_' . $xPk);
+
+        $xRefTableName1 = $db_x.mb_strtolower("{$tableName}_link_{$xTableName}");
+        $xRefTableName2 = $db_x.mb_strtolower("{$xTableName}_link_{$tableName}");
 
         $xRefTable = false;
         if ($this->tableExists($xRefTableName1)) {
@@ -1031,7 +1038,9 @@ abstract class Som_Model_Mapper_Abstract
         }
         if (!$xRefTable) return false;
 
-        $query = "SELECT {$tq}{$xPKey}{$tq} FROM {$tq}$xRefTable{$tq} WHERE {$pKey}=$id AND {$tq}name{$tq}='{$fieldName}'";
+        $query = "SELECT ".$this->quoteIdentifier($xPKey)." FROM ".$this->quoteIdentifier($xRefTable).
+            " WHERE ".$this->quoteIdentifier($pKey)."={$id} AND ".$this->quoteIdentifier('name')."=".$this->quote($fieldName);
+
         $xRefs = $this->query($query)->fetchAll(PDO::FETCH_COLUMN);
 
         if (count($xRefs) <= 0) return null;
