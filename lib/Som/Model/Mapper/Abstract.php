@@ -939,8 +939,6 @@ abstract class Som_Model_Mapper_Abstract
      */
     public function quote($data)
     {
-        // /!\/!\/!\/!\ этот метод дополняется из наследников! Будьте внимательны.
-
         if (is_string($data)) return $this->_adapter->quote($data);
 
         if (!is_array($data)) return $data;
@@ -1147,7 +1145,7 @@ abstract class Som_Model_Mapper_Abstract
 
         // Find new links, count old links that have been left
         $cnt = 0;
-        $isstr = false;
+        $isStr = false;
 
         if (!empty($data)) {
             foreach ($data as $item) {
@@ -1160,21 +1158,26 @@ abstract class Som_Model_Mapper_Abstract
                 }
             }
         }
+
         // Remove old links that have been removed
         $rem_xRefs = array_diff($old_xRefs, $kept_xRefs);
         if (count($rem_xRefs) > 0) {
-            $inCond = "(" . implode(",", $rem_xRefs) . ")";
+            $inCond = "(" . implode(",", $this->quote($rem_xRefs)) . ")";
             $this->delete($xRefTable, "{$priKey}=$id AND {$rPriKey} IN $inCond AND ".$this->quoteIdentifier('name')."=".$this->quote($fieldName));
         }
+
         // Add new xRefs
         foreach ($new_xRefs as $item) {
-            if ((!$isstr && $item > 0) || ($isstr && $item != '')) {
+            $isStr = !is_int($item) && !is_float($item) && is_string($item);
+
+            if ((!$isStr && $item > 0) || ($isStr && $item != '')) {
                 $upData = array(
                     $priKey => $id,
                     $rPriKey => $item,
                     'name' => $fieldName
                 );
                 $res = $this->insert($xRefTable, $upData);
+
                 if ($res === false) {
                     $error = $this->_adapter->errorInfo();
                     throw new Exception("SQL Error {$error[0]}: {$error[2]}");
