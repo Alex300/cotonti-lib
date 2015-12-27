@@ -504,11 +504,11 @@ abstract class Som_Model_Mapper_Abstract
         if (!empty($model)) {
             $fields = $model::fields();
             if (!empty($fields)) {
-                foreach ($fields as $fieldName => $field) {
+                foreach ($fields as $name => $field) {
                     if (isset($field['link']) && in_array($field['link']['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
-                        $fieldData = $model->rawValue($fieldName);
+                        $fieldData = $model->rawValue($name);
                         if (empty($fieldData)) $fieldData = null;
-                        $this->saveXRef($field['link']["model"], $id, $fieldData, $fieldName);
+                        $this->saveXRef($field['link']["model"], $id, $fieldData, $name);
                     }
                 }
             }
@@ -591,10 +591,9 @@ abstract class Som_Model_Mapper_Abstract
 
             $fields = $model->fieldList();
             if (!empty($fields)) {
-                foreach ($fields as $field) {
+                foreach ($fields as $name => $field) {
                     if ($field['type'] == 'link' && in_array($field['link']['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
-                        $localkey = (!empty($field['link']['localKey'])) ? $field['link']['localKey'] : $field['name'];
-                        $this->deleteXRef($field['link']["model"], $id, $localkey);
+                        $this->deleteXRef($field['link']["model"], $id, $name);
                     }
                 }
             }
@@ -1244,7 +1243,7 @@ abstract class Som_Model_Mapper_Abstract
         }
     }
 
-        /**
+    /**
      * Parses PDO exception message and returns its components and status
      *
      * @param PDOException $e PDO Exception
