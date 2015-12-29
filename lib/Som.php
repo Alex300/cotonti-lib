@@ -7,9 +7,8 @@
  * @author Gert Hengeveld (ORM from cot-factory)
  * @author Mankov
  * @author Kalnov Alexey <kalnov_alexey@yandex.ru> http://portal30.ru
- * @version 1.3
+ * @version 1.3.1
  *
- *  @todo Models   Hooks for before/after insert, update, delete methods
  *
  *  @todo Models   use cot_build_extrafields_data and cot_parse
  *                 В общем вывод в форму и на страницу нужно как то разделить
