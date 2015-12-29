@@ -659,7 +659,19 @@ abstract class Som_Model_Abstract
         return static::$_db->fetch($conditions, $limit, $offset, $order);
     }
 
-    protected function beforeSave(&$data = null){ return true; }
+    protected function beforeSave(&$data = null) {
+        $className = get_called_class();
+
+        $return = true;
+
+        /* === Hook === */
+        foreach (cot_getextplugins($className.'.before.save') as $pl) {
+            include $pl;
+        }
+        /* ===== */
+
+        return $return;
+    }
 
     /**
      * Save data
@@ -695,15 +707,42 @@ abstract class Som_Model_Abstract
         return $id;
     }
 
-    protected function afterSave(){}
+    protected function afterSave() {
+        $className = get_called_class();
 
-    protected function beforeInsert(){ return true; }
+        /* === Hook === */
+        foreach (cot_getextplugins($className.'.after.save') as $pl) {
+            include $pl;
+        }
+        /* ===== */
+    }
+
+    protected function beforeInsert() {
+        $className = get_called_class();
+        $fields = static::fields();
+
+        // Заполнение волшебных полей
+        if(array_key_exists('created',    $fields)) $this->_data['created']    = date('Y-m-d H:i:s', cot::$sys['now']);
+        if(array_key_exists('created_by', $fields)) $this->_data['created_by'] = cot::$usr['id'];
+        if(array_key_exists('updated',    $fields)) $this->_data['updated']    = date('Y-m-d H:i:s', cot::$sys['now']);
+        if(array_key_exists('updated_by', $fields)) $this->_data['updated_by'] = cot::$usr['id'];
+
+        $return = true;
+
+        /* === Hook === */
+        foreach (cot_getextplugins($className.'.before.insert') as $pl) {
+            include $pl;
+        }
+        /* ===== */
+
+        return $return;
+    }
 
     /**
      * Create object
      * @return int created object id
      */
-    protected final function insert(){
+    protected final function insert() {
         if($this->beforeInsert()){
             $id = static::$_db->insert($this);
 
@@ -716,15 +755,40 @@ abstract class Som_Model_Abstract
 
     }
 
-    protected function afterInsert(){ }
+    protected function afterInsert() {
+        $className = get_called_class();
+
+        /* === Hook === */
+        foreach (cot_getextplugins($className.'.after.insert') as $pl) {
+            include $pl;
+        }
+        /* ===== */
+    }
 
 
-    protected function beforeUpdate(){ return true; }
+    protected function beforeUpdate() {
+        $className = get_called_class();
+        $fields = static::fields();
+
+        // Заполнение волшебных полей
+        if(array_key_exists('updated',    $fields)) $this->_data['updated']    = date('Y-m-d H:i:s', cot::$sys['now']);
+        if(array_key_exists('updated_by', $fields)) $this->_data['updated_by'] = cot::$usr['id'];
+
+        $return = true;
+
+        /* === Hook === */
+        foreach (cot_getextplugins($className.'.before.update') as $pl) {
+            include $pl;
+        }
+        /* ===== */
+
+        return $return;
+    }
 
     /**
      * Update object
      */
-    protected final function update(){
+    protected final function update() {
         $className = get_called_class();
 
         if($this->beforeUpdate()){
@@ -736,7 +800,15 @@ abstract class Som_Model_Abstract
         }
     }
 
-    protected function afterUpdate(){ }
+    protected function afterUpdate() {
+        $className = get_called_class();
+
+        /* === Hook === */
+        foreach (cot_getextplugins($className.'.after.update') as $pl) {
+            include $pl;
+        }
+        /* ===== */
+    }
 
     /**
      * Обновить набор элементов, соотвествующих условию
@@ -754,7 +826,19 @@ abstract class Som_Model_Abstract
         return static::$_db->update(static::$_tbname, $data, $condition);
     }
 
-    protected function beforeDelete(){ return true; }
+    protected function beforeDelete() {
+        $className = get_called_class();
+
+        $return = true;
+
+        /* === Hook === */
+        foreach (cot_getextplugins($className.'.before.delete') as $pl) {
+            include $pl;
+        }
+        /* ===== */
+
+        return $return;
+    }
 
     /**
      * Delete object
@@ -784,7 +868,15 @@ abstract class Som_Model_Abstract
         return true;
     }
 
-    protected function afterDelete(){ return true; }
+    protected function afterDelete() {
+        $className = get_called_class();
+
+        /* === Hook === */
+        foreach (cot_getextplugins($className.'.after.delete') as $pl) {
+            include $pl;
+        }
+        /* ===== */
+    }
 
     /**
      * Получить количество элементов, соотвествующих условию
@@ -1108,8 +1200,8 @@ abstract class Som_Model_Abstract
      * @todo дописать метод
      */
     public function validate($validateFields = null, $errorMessages = true) {
+        $className = get_called_class();
         $validators = $this->validators();
-
         $fields = static::fields();
 
         foreach($this->requiredFields() as $field){
@@ -1220,7 +1312,15 @@ abstract class Som_Model_Abstract
             }
         }
 
-        return count($this->_errors) ? false : true;
+        $return = count($this->_errors) ? false : true;
+
+        /* === Hook === */
+        foreach (cot_getextplugins($className.'.validate') as $pl) {
+            include $pl;
+        }
+        /* ===== */
+
+        return $return;
     }
 
     /**
@@ -1228,7 +1328,19 @@ abstract class Som_Model_Abstract
      * Этот метод полезно переопределять для создания проверок спецефичных для конкретной модели
      * @return bool
      */
-    public function validateDelete() { return true; }
+    public function validateDelete($errorMessages = true) {
+        $className = get_called_class();
+
+        $return = true;
+
+        /* === Hook === */
+        foreach (cot_getextplugins($className.'.validate.delete') as $pl) {
+            include $pl;
+        }
+        /* ===== */
+
+        return $return;
+    }
     // ==== /Методы для Валидации ====
 
     /**
