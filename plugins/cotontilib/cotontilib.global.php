@@ -69,4 +69,4 @@ if(!function_exists('cot_formGroupClass')) {
         return '';
     }
 }
-// ==== View template functions ====
+// ==== /View template functions ====
