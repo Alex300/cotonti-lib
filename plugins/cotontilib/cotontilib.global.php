@@ -41,3 +41,32 @@ function var_dump__() {
     call_user_func_array('var_dump_', $params);
     exit;
 }
+
+// ==== View template functions ====
+if(!function_exists('cot_formGroupClass')) {
+    /**
+     * Класс для элемента формы
+     * @param $name
+     * @return string
+     */
+    function cot_formGroupClass($name)
+    {
+        global $currentMessages;
+
+        if (!cot::$cfg['msg_separate']) return '';
+
+        $error = '';
+        $error .= cot_implode_messages($name, 'error');
+
+        if ($error) return 'has-error';
+
+        if (!empty($currentMessages[$name]) && is_array($currentMessages[$name])) {
+            foreach ($currentMessages[$name] as $msg) {
+                if ($msg['class'] == 'error') return 'has-error';
+            }
+        }
+
+        return '';
+    }
+}
+// ==== View template functions ====
