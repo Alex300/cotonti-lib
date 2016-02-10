@@ -32,6 +32,7 @@ class cotontilib_controller_User
         global $cot_extrafields;
 
         if(cot::$usr['id'] == 0) cot_die_message(404, false);
+        if(!cot_check_xp() && !cot_check_xg(false)) cot_die_message(404, false);
 
         $q = cot_import('q', 'G', 'TXT');
         if($q == '') exit;
