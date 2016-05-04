@@ -52,12 +52,12 @@ abstract class Som_Model_Mapper_Abstract
     );
 
     /**
-     * @param $dbinfo
      * @param string $dbc
+     * @param array  $dbInfo
      */
-    function __construct($dbinfo, $dbc = 'db'){
-        $this->_dbinfo = $dbinfo;
+    function __construct($dbc = 'db', $dbInfo = array() ){
         $this->_adapter = static::connect($dbc);
+        $this->_dbinfo = $dbInfo;
     }
 
     /**
@@ -393,12 +393,18 @@ abstract class Som_Model_Mapper_Abstract
                         if ($j > 0) $keys .= ',';
                         $keys .= "{$tq}$key{$tq}";
                     }
-                    if (is_null($val) && $insert_null) {
+                    if (is_null($val) || $val === 'NULL') {
                         $vals .= 'NULL';
+                        
+                    } elseif (is_bool($val)) {
+                        $vals .= $val ? 'TRUE' : 'FALSE';
+                    
                     } elseif ($val === 'NOW()') {
                         $vals .= 'NOW()';
+                        
                     } elseif (is_int($val) || is_float($val)) {
                         $vals .= $val;
+                        
                     } else {
                         $vals .= static::quote($val);
                     }
@@ -530,12 +536,18 @@ abstract class Som_Model_Mapper_Abstract
             if (is_null($val) && !$update_null) continue;
 
             $upd .= "{$tq}$key{$tq}=";
-            if (is_null($val)) {
+            if (is_null($val) || $val === 'NULL') {
                 $upd .= 'NULL,';
+                
+            } elseif (is_bool($val)) {
+                $upd .= $val ? 'TRUE,' : 'FALSE,';
+                
             } elseif ($val === 'NOW()') {
                 $upd .= 'NOW(),';
+                
             } elseif (is_int($val) || is_float($val)) {
                 $upd .= $val . ',';
+                
             } else {
                 $upd .= $this->quote($val) . ',';
             }

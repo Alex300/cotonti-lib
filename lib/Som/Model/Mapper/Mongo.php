@@ -1,12 +1,11 @@
 <?php
-
 /**
- *
  * Mongo Mapper
  *
  * @author Mankov
  */
-class Som_Model_Mapper_Mongo extends Som_Model_Mapper_Abstract implements Som_Model_Mapper_Interface {
+class Som_Model_Mapper_Mongo extends Som_Model_Mapper_Abstract 
+{
 
     protected $_adapter = null;
     protected $_dbinfo = null;

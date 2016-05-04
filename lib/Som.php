@@ -7,7 +7,7 @@
  * @author Gert Hengeveld (ORM from cot-factory)
  * @author Mankov
  * @author Kalnov Alexey <kalnov_alexey@yandex.ru> http://portal30.ru
- * @version 1.3.1
+ * @version 2.0
  *
  *
  *  @todo Models   use cot_build_extrafields_data and cot_parse
@@ -22,52 +22,56 @@ class Som
     const TO_MANY = 'tomany';
     const TO_MANY_NULL = 'tomanynull';
 
+    const ADAPTER_MYSQL = 'mysql';
+    const ADAPTER_POSTGRESQL = 'pgsql';
+    const ADAPTER_MONGO = 'mongo';
+
     /**
      * Adapter Factory
      *
-     * @param string $db
-     * @param array $dbinfo
+     * @param string $db        Connection Name
+     * @param array  $dbInfo
      *
      * Db connection config example:
      *
-     * cot::$cfg['db_avtochuvasiya'] = array(
-     *      'adapter' => 'mysql',   // 'pgsql' or 'mongo'
+     * cot::$cfg['db_connection_name'] = array(
+     *      'adapter' => Som::ADAPTER_MYSQL,   // Som::ADAPTER_POSTGRESQL or Som::ADAPTER_MONGO
      *      'host' => '127.0.0.1',
      *      'port' => null,
-     *      'username' => 'root',
+     *      'username' => 'notroot',
      *      'password' => '123456',
-     *      'dbname' => 'avtochuvashija',
+     *      'dbname' => 'data_base_name',
      * );
      *
      *
      * @return Som_Model_Mapper_Abstract
      * @throws Exception
      */
-    public static function getAdapter($db = 'db', $dbinfo = array()) {
+    public static function getAdapter($db = 'db', $dbInfo = array()) {
 
         // Default cotonti connection
-        if($db == 'db') return new Som_Model_Mapper_Mysql($dbinfo, 'db');
+        if($db == 'db') return new Som_Model_Mapper_Mysql('db', $dbInfo);
 
         if(empty(cot::$cfg[$db]) || empty(cot::$cfg[$db]['adapter'])) {
             throw new Exception('Connection config not found in $cfg['.$db.']');
         }
 
-        $dbtype = cot::$cfg[$db]['adapter'];
+        $dbType = cot::$cfg[$db]['adapter'];
 
-        switch ($dbtype) {
-            case 'mysql':
-                return new Som_Model_Mapper_Mysql($dbinfo, $db);
+        switch ($dbType) {
+            case Som::ADAPTER_MYSQL:
+                return new Som_Model_Mapper_Mysql($db, $dbInfo);
                 break;
 
-            case 'pgsql':
-                return new Som_Model_Mapper_Pgsql($dbinfo, $db);
+            case Som::ADAPTER_POSTGRESQL:
+                return new Som_Model_Mapper_Pgsql($db, $dbInfo);
                 break;
 
-            case 'mongo':
-                return new Som_Model_Mapper_Mongo($dbinfo, $db);
+            case Som::ADAPTER_MONGO:
+                return new Som_Model_Mapper_Mongo($db, $dbInfo);
 
             default:
-                throw new Exception("DB Adapter not found «{$dbtype}»");
+                throw new Exception("DB Adapter not found «{$dbType}»");
         }
     }
 
