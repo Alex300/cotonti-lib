@@ -107,7 +107,7 @@ if($num = array_search('--a', $argv)) {
             echo $content."\n";
             echo "---------------------------------------------------------------------------\n";
         }
-        unset($Controller);
+        unset($content);
         echo "Stopped at ".date('Y-m-d H:i:s')."\n";
         //ob_end_flush();
     }
