@@ -291,7 +291,7 @@ abstract class Som_Model_Abstract extends Component
         throw new Exception_InvalidCall('Unsetting an unknown or read-only property: ' . get_class($this) . '::' . $name);
     }
 
-    public function beforeSetData(&$data)
+    protected function beforeSetData(&$data)
     {
         $className = get_called_class();
         $return = true;

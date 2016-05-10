@@ -806,19 +806,23 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
     }
 
     /**
-     * Обновить набор элементов, соотвествующих условию
+     * Updates the whole table using the provided attribute values and conditions.
+     * For example, to change the status to be 1 for all customers whose status is 2:
      *
-     * @param array $data
-     * @param mixed $condition
-     * @return int
+     * ```php
+     * Customer::updateAll(['status' => 1], 'status = 2');
+     * ```
+     *
+     * @param array $data       Values (name-value pairs) to be saved into the table
+     * @param mixed $condition  Conditions that will be put in the WHERE part of the UPDATE SQL.
+     * @return int Number of rows updated
      * @throws Exception
-     *
      */
-    public static function updateRows($data, $condition = ''){
+    public static function updateAll($data, $condition = '', $params = array()){
         if (empty($data)) {
             throw new Exception('$data is empty');
         }
-        return static::$_db->update(static::$_tbname, $data, $condition);
+        return static::$_db->update(static::$_tbname, $data, $condition, $params, true);
     }
 
     protected function beforeDelete() {
@@ -879,6 +883,25 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         /* ===== */
 
         $this->trigger(self::EVENT_AFTER_DELETE);
+    }
+
+    /**
+     * Deletes rows in the table using the provided conditions.
+     * WARNING: If you do not specify any condition, this method will delete ALL rows in the table.
+     *
+     * For example, to delete all customers whose status is 3:
+     *
+     * ```php
+     * Customer::deleteAll('status = 3');
+     * ```
+     *
+     * @param string $condition Conditions that will be put in the WHERE part of the DELETE SQL.
+     * @param array $params     Parameters (name => value) to be bound to the query.
+     * @return int Number of rows deleted
+     */
+    public static function deleteAll($condition = '', $params = array())
+    {
+        return static::$_db->delete(static::$_tbname, $condition, $params);
     }
 
     /**
