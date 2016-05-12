@@ -96,7 +96,7 @@ abstract class Som_Model_Abstract extends Component
      * Initializes the object.
      * @param array $data данные для инициализации модели
      */
-    protected function init(&$data = array())
+    protected function init(&$data = null)
     {
     }
 
