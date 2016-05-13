@@ -289,7 +289,7 @@ class Component extends Object
      */
     public function __clone()
     {
-        $this->_events = [];
+        $this->_events = array();
         $this->_behaviors = null;
     }
 
@@ -640,7 +640,7 @@ class Component extends Object
     public function ensureBehaviors()
     {
         if ($this->_behaviors === null) {
-            $this->_behaviors = [];
+            $this->_behaviors = array();
             foreach ($this->behaviors() as $name => $behavior) {
                 $this->attachBehaviorInternal($name, $behavior);
             }
