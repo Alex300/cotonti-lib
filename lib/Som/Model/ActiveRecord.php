@@ -415,6 +415,16 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
     }
 
     /**
+     * This method is called after the object is created by cloning an existing one.
+     * It removes all old data because it is attached to the old object.
+     */
+    public function __clone()
+    {
+        parent::__clone();
+        $this->_oldData = array();
+    }
+
+    /**
      * Возвращает элемент в виде массива
      * @return array
      */
