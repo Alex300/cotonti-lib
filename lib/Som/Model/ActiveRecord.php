@@ -99,6 +99,11 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
                     'default'   => $field['field_default'],
                 );
 
+                if($field['field_default'] == '' && in_array($field['field_type'], array('inputint', 'currency', 'double',
+                        'datetime'))) {
+                    $data['default'] = 0;
+                }
+                
                 $className::addFieldToAll($data, $className);
             }
         }
