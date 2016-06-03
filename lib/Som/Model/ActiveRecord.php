@@ -87,7 +87,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
 
             foreach(cot::$extrafields[static::$_tbname] as $key => $field) {
                 if(!array_key_exists($field['field_type'], $dbAdapter::$extraTypesMap)) continue;
-                $desc = $field['field_description'];
+                $desc = cot_extrafield_title($field, $className.'_');
                 if(isset(cot::$L[$className.'_'.$field['field_name'].'_title'])) {
                     $desc = cot::$L[$className.'_'.$field['field_name'].'_title'];
                 }
