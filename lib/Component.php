@@ -277,7 +277,7 @@ class Component extends Object
         $this->ensureBehaviors();
         foreach ($this->_behaviors as $object) {
             if ($object->hasMethod($name)) {
-                return call_user_func_array([$object, $name], $params);
+                return call_user_func_array(array($object, $name), $params);
             }
         }
         throw new Exception_UnknownMethod('Calling unknown method: ' . get_class($this) . "::$name()");
@@ -428,7 +428,7 @@ class Component extends Object
      */
     public function behaviors()
     {
-        return [];
+        return array();
     }
 
     /**
@@ -476,9 +476,9 @@ class Component extends Object
     {
         $this->ensureBehaviors();
         if ($append || empty($this->_events[$name])) {
-            $this->_events[$name][] = [$handler, $data];
+            $this->_events[$name][] = array($handler, $data);
         } else {
-            array_unshift($this->_events[$name], [$handler, $data]);
+            array_unshift($this->_events[$name], array($handler, $data));
         }
     }
 
