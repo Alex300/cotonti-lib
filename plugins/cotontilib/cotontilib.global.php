@@ -19,6 +19,18 @@ require_once 'lib/Loader.php';
 Loader::register();
 
 /**
+ * Make a string's first character uppercase
+ * @link http://php.net/manual/en/function.ucfirst.php
+ *
+ * @param string $str The input string.
+ * @return string the resulting string.
+ */
+function mb_ucfirst($str) {
+    $fc = mb_strtoupper(mb_substr($str, 0, 1));
+    return $fc.mb_substr($str, 1);
+}
+
+/**
  * Standard var_dump with <pre>
  *
  * @param mixed $var[,$var1],[.. varN]
