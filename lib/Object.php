@@ -97,7 +97,7 @@ class Object
      *
      * @param array $config name-value pairs that will be used to initialize the object properties
      */
-    public function __construct($config = [])
+    public function __construct($config = array())
     {
         if (!empty($config)) {
             foreach ($config as $name => $value) {
