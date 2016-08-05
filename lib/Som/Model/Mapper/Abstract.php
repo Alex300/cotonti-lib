@@ -489,10 +489,10 @@ abstract class Som_Model_Mapper_Abstract
         $model = null;
         $tq = $this->tableQuote;
 
-        if ($table_name instanceof Som_Model_Abstract) {
+        if ($table_name instanceof Som_Model_ActiveRecord) {
             $model = $table_name;
-            $table_name = $this->_dbinfo['tbname'];
-            $pkey = $this->_dbinfo['pkey'];
+            $table_name = $model::tableName();
+            $pkey = $model::primaryKey();
 
             if (empty($data)) {
                 // When save models, by default we must save null values too

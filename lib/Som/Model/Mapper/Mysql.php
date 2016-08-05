@@ -241,7 +241,7 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
         if(is_string($old)) $old = array('name'=>$old);
         if(is_string($new)) $new = array('name'=>$new);
 
-        if(!$this->fieldExist($old['name'])) return false;
+        if(!$this->fieldExists($old['name'])) return false;
 
         // To change column a from INTEGER to TINYINT NOT NULL
         // ALTER TABLE t2 MODIFY a TINYINT NOT NULL
