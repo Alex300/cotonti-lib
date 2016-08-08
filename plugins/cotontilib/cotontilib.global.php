@@ -49,6 +49,7 @@ function var_dump_() {
  * @param mixed $var[,$var1],[.. varN]
  */
 function var_dump__() {
+    cot_sendheaders();
     $params = func_get_args();
     call_user_func_array('var_dump_', $params);
     exit;
