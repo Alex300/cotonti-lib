@@ -134,16 +134,15 @@ class View{
     /**
      * Return Template Script Path
      *
-     * @param $base имя файла шаблона. Если не указано расширение или оно не входит в $_extensions, будет использовано
+     * @param string $base имя файла шаблона. Если не указано расширение или оно не входит в $_extensions, будет использовано
      *              '.php'
      *              The default search order is:
      *                1) Current theme folder (plugins/ subdir for plugins, admin/ subdir for admin)
      *                2) Default theme folder (if current is not default)
      *                3) tpl subdir in module/plugin folder (fallback template)
+     * 
      * @param string $type Extension type: 'plug', 'module' or 'core'
-     * @param null $admin  Use admin theme file if present. Tries to determine from viewFile string by default.
-     * @param string $type
-     * @param null $admin
+     * @param bool|null $admin  Use admin theme file if present. Tries to determine from viewFile string by default.
      * @throws Exception
      *
      * @return string
