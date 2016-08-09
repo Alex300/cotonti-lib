@@ -132,12 +132,8 @@ abstract class Som_Model_Abstract extends Component
             }
         }
 
-        if (isset($this->_data[$name])) {
-            return $this->_data[$name];
-        }
-        if (isset($this->_extraData[$name])) {
-            return $this->_extraData[$name];
-        }
+        if (isset($this->_data[$name]))      return $this->_data[$name];
+        if (isset($this->_extraData[$name])) return $this->_extraData[$name];
 
 //        if (method_exists($this, 'set' . ucfirst($name))) {
 //            throw new Exception_InvalidCall('Getting write-only property: ' . get_class($this) . '::' . $name);
@@ -225,29 +221,9 @@ abstract class Som_Model_Abstract extends Component
             return $this->$methodName();
         }
 
-        $getter = 'get' . ucfirst($name);
-        if (method_exists($this, $getter)) {
-            return $this->$getter() !== null;
-        } else {
-            // behavior property
-            $this->ensureBehaviors();
-            foreach ($this->_behaviors as $behavior) {
-                if ($behavior->canGetProperty($name)) {
-                    return $behavior->$name !== null;
-                }
-            }
-        }
-
-        if (isset($this->_data[$name])) {
-            return true;
-        }
-
-        if (isset($this->_extraData[$name])) {
-            return true;
-        }
-
         try {
-            return $this->__get($name) !== null;
+            $tmp = $this->__get($name);
+            return $tmp !== null;
         } catch (Exception $e) {
             return false;
         }

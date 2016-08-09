@@ -214,7 +214,8 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * @return mixed
      * @throws Exception
      */
-    public function __set($name, $value) {
+    public function __set($name, $value)
+    {
         $fields = static::fields();
 
         $link = false;
@@ -345,7 +346,8 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * @param string $name The property name
      * @return boolean whether the property value is null
      */
-    public function __isset($name) {
+    public function __isset($name)
+    {
         $methodName = 'isset' . ucfirst($name);
         if (method_exists($this, $methodName)) {
             return $this->$methodName();
@@ -370,16 +372,12 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
             }
         }
 
-        if (isset($this->_data[$name])) {
-            return true;
-        }
-
-        if (isset($this->_extraData[$name])) {
-            return true;
-        }
+        if (isset($this->_data[$name]))      return true;
+        if (isset($this->_extraData[$name])) return true;
 
         try {
-            return $this->__get($name) !== null;
+            $tmp = $this->__get($name);
+            return $tmp !== null;
         } catch (Exception $e) {
             return false;
         }
@@ -393,7 +391,8 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      *
      * @param string $name The property name
      */
-    public function __unset($name) {
+    public function __unset($name)
+    {
         $methodName = 'unset' . ucfirst($name);
         if (method_exists($this, $methodName)) {
             return $this->$methodName();
@@ -423,8 +422,14 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
             }
         }
 
-        if (isset($this->_data[$name])) unset($this->_data[$name]);
-        if (isset($this->_extraData[$name])) unset($this->_extraData[$name]);
+        if (isset($this->_data[$name])) {
+            unset($this->_data[$name]);
+            return;
+        }
+        if (isset($this->_extraData[$name])) {
+            unset($this->_extraData[$name]);
+            return;
+        }
     }
 
     /**
@@ -441,7 +446,8 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * Возвращает элемент в виде массива
      * @return array
      */
-    function toArray() {
+    function toArray()
+    {
         $data = $this->_data;
         return $data;
     }
@@ -455,7 +461,8 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * @throws Exception
      * @return bool
      */
-    public function setData($data, $safe = true) {
+    public function setData($data, $safe = true)
+    {
         $fields = static::fields();
 
         if (!$this->beforeSetData($data)) {
