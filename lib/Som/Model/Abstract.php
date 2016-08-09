@@ -241,6 +241,12 @@ abstract class Som_Model_Abstract extends Component
             return true;
         }
 
+        try {
+            return $this->__get($name) !== null;
+        } catch (Exception $e) {
+            return false;
+        }
+
         return false;
     }
 

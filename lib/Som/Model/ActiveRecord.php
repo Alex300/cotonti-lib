@@ -151,145 +151,14 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
 
     // ==== Методы для манипуляции с данными ====
     /**
-     * @access public
+     * PHP getter magic method.
+     * This method is overridden so that attributes and related objects can be accessed like properties.
      *
-     * @param string $name
-     * @param mixed $val
-     *
-     * @throws Exception
-     * @return mixed
-     */
-    public function __set($name, $val) {
-        $fields = static::fields();
-
-        $link = false;
-        // Проверка связей
-        if (isset($fields[$name]) && $fields[$name]['type'] == 'link') {
-            $link = (array)$fields[$name]['link'];
-            $localkey = (!empty($link['localKey'])) ? $link['localKey'] : $name;
-            $className = $link['model'];
-        }
-
-        // Set old data
-        if(isset($fields[$name]) && !isset($this->_oldData[$name])) {
-            if($link) {
-                if (in_array($link['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
-                    $newData = $val;
-                    $oldData = (isset($this->_linkData[$name])) ? $this->_linkData[$name] : null;
-                    if(!is_array($newData)) $newData = array($newData);
-                    if(!is_array($oldData)) $oldData = array($oldData);
-                    if(!static::compareArrays($oldData, $newData)) $this->_oldData[$name] = $oldData;
-
-                } elseif(in_array($link['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
-                    if ($val instanceof Som_Model_Abstract) {
-                        if($this->_data[$localkey] != $val->getId()) {
-                            $this->_oldData[$name] = $this->_data[$localkey];
-                        }
-                    } else {
-                        if($this->_data[$localkey] != $val) {
-                            $this->_oldData[$name] = $this->_data[$localkey];
-                        }
-                    }
-                }
-
-            } elseif(in_array($fields[$name]['type'], array('datetime', 'date', 'timestamp')) ){
-                if(strtotime($this->_data[$name]) != strtotime($val)){
-                    $this->_oldData[$name] = $this->_data[$name];
-                }
-
-            } elseif($this->_data[$name] != $val) {
-                $this->_oldData[$name] = $this->_data[$name];
-            }
-
-        }
-
-        $methodName = 'set' . ucfirst($name);
-        if ($methodName != 'setData' && method_exists($this, $methodName)) {
-            return $this->$methodName($val);
-        }
-
-        // если передали объект, Один ко многим
-        if ($val instanceof Som_Model_Abstract) {
-            // Проверка типа
-            if ($link) {
-                if ($val instanceof $className) {
-                    $val = $val->getId();
-                } else {
-                    throw new Exception("Тип переданного значения не соответствует пипу поля. Должно быть: $className");
-                }
-            } elseif (in_array($name, static::getColumns())) {
-                throw new Exception("Связь для поля '{$name}' не найдена");
-            }
-        }
-
-
-        // Если это связь
-        if ($link) {
-            // Один ко многим
-            if (in_array($link['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
-                $this->_data[$localkey] = $val;
-                return true;
-            }
-            if (in_array($link['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
-                if (!is_array($val)) $val = array($val);
-                $this->_linkData[$name] = array();
-                foreach ($val as $value) {
-                    // todo проверка типов
-                    if ($value instanceof $className) {
-                        $this->_linkData[$name][] = $value->getId();
-                    } elseif ($value) {
-                        $this->_linkData[$name][] = $value;
-                    }
-                }
-            }
-        }
-
-        // input filter
-        if (in_array($name, static::getColumns())) {
-            // @todo общие типы данных, независимые от типа БД
-            switch ($fields[$name]['type']) {
-                case 'tinyint':
-                case 'smallint':
-                case 'mediumint':
-                case 'int':
-                case 'bigint':
-                    if(!( is_numeric($val) && ($f = (float)$val) == (int)$f ))  $val = null;
-                    break;
-
-                case 'float':
-                case 'double':
-                case 'decimal':
-                case 'numeric':
-                    if(mb_strpos($val, ',') !== false) $val = str_replace(',', '.', $val);
-                    $val = cot_import($val, 'DIRECT', 'NUM');
-                    break;
-
-                case 'bool':
-                    if(!is_null($val)) $val = (bool)$val;
-                    break;
-
-                case 'varchar':
-                case 'text':
-                    $val = cot_import($val, 'DIRECT', 'HTM');
-                    break;
-            }
-            $this->_data[$name] = $val;
-
-        } elseif (!$link) {
-            $this->_extraData[$name] = $val;
-        }
-
-        return true;
-    }
-
-    /**
-     * @access public
-     *
-     * @param  $name
-     *
+     * @param string $name The property name
      * @return null|mixed|Som_Model_Abstract
      */
-    public function __get($name) {
+    public function __get($name)
+    {
         $methodName = 'get' . ucfirst($name);
         if (method_exists($this, $methodName)) {
             return $this->$methodName();
@@ -337,13 +206,147 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
     }
 
     /**
+     * PHP setter magic method.
+     * This method is overridden so that AR attributes can be accessed like properties.
+     *
+     * @param string $name Property name
+     * @param mixed $value Property value
+     * @return mixed
+     * @throws Exception
+     */
+    public function __set($name, $value) {
+        $fields = static::fields();
+
+        $link = false;
+        // Проверка связей
+        if (isset($fields[$name]) && $fields[$name]['type'] == 'link') {
+            $link = (array)$fields[$name]['link'];
+            $localkey = (!empty($link['localKey'])) ? $link['localKey'] : $name;
+            $className = $link['model'];
+        }
+
+        // Set old data
+        if(isset($fields[$name]) && !isset($this->_oldData[$name])) {
+            if($link) {
+                if (in_array($link['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+                    $newData = $value;
+                    $oldData = (isset($this->_linkData[$name])) ? $this->_linkData[$name] : null;
+                    if(!is_array($newData)) $newData = array($newData);
+                    if(!is_array($oldData)) $oldData = array($oldData);
+                    if(!static::compareArrays($oldData, $newData)) $this->_oldData[$name] = $oldData;
+
+                } elseif(in_array($link['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
+                    if ($value instanceof Som_Model_Abstract) {
+                        if($this->_data[$localkey] != $value->getId()) {
+                            $this->_oldData[$name] = $this->_data[$localkey];
+                        }
+                    } else {
+                        if($this->_data[$localkey] != $value) {
+                            $this->_oldData[$name] = $this->_data[$localkey];
+                        }
+                    }
+                }
+
+            } elseif(in_array($fields[$name]['type'], array('datetime', 'date', 'timestamp')) ){
+                if(strtotime($this->_data[$name]) != strtotime($value)){
+                    $this->_oldData[$name] = $this->_data[$name];
+                }
+
+            } elseif($this->_data[$name] != $value) {
+                $this->_oldData[$name] = $this->_data[$name];
+            }
+
+        }
+
+        $methodName = 'set' . ucfirst($name);
+        if ($methodName != 'setData' && method_exists($this, $methodName)) {
+            return $this->$methodName($value);
+        }
+
+        // если передали объект, Один ко многим
+        if ($value instanceof Som_Model_Abstract) {
+            // Проверка типа
+            if ($link) {
+                if ($value instanceof $className) {
+                    $value = $value->getId();
+                } else {
+                    throw new Exception("Тип переданного значения не соответствует пипу поля. Должно быть: $className");
+                }
+            } elseif (in_array($name, static::getColumns())) {
+                throw new Exception("Связь для поля '{$name}' не найдена");
+            }
+        }
+
+
+        // Если это связь
+        if ($link) {
+            // Один ко многим
+            if (in_array($link['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
+                $this->_data[$localkey] = $value;
+                return true;
+            }
+            if (in_array($link['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+                if (!is_array($value)) $value = array($value);
+                $this->_linkData[$name] = array();
+                foreach ($value as $valRow) {
+                    // todo проверка типов
+                    if ($valRow instanceof $className) {
+                        $this->_linkData[$name][] = $valRow->getId();
+                    } elseif ($valRow) {
+                        $this->_linkData[$name][] = $valRow;
+                    }
+                }
+            }
+        }
+
+        // input filter
+        if (in_array($name, static::getColumns())) {
+            // @todo общие типы данных, независимые от типа БД
+            switch ($fields[$name]['type']) {
+                case 'tinyint':
+                case 'smallint':
+                case 'mediumint':
+                case 'int':
+                case 'bigint':
+                    if(!( is_numeric($value) && ($f = (float)$value) == (int)$f ))  $value = null;
+                    break;
+
+                case 'float':
+                case 'double':
+                case 'decimal':
+                case 'numeric':
+                    if(mb_strpos($value, ',') !== false) $value = str_replace(',', '.', $value);
+                    $value = cot_import($value, 'DIRECT', 'NUM');
+                    break;
+
+                case 'bool':
+                    if(!is_null($value)) $value = (bool)$value;
+                    break;
+
+                case 'varchar':
+                case 'text':
+                    $value = cot_import($value, 'DIRECT', 'HTM');
+                    break;
+            }
+            $this->_data[$name] = $value;
+
+        } elseif (!$link) {
+            $this->_extraData[$name] = $value;
+        }
+
+        return true;
+    }
+
+    /**
+     * Checks if a property value is null.
+     *
      * isset() handler for object properties.
      *
-     * @param $column
-     * @return bool
+     * @param string $name The property name
+     * @return boolean whether the property value is null
      */
-    public function __isset($column) {
-        $methodName = 'isset' . ucfirst($column);
+    public function __isset($name) {
+        $methodName = 'isset' . ucfirst($name);
         if (method_exists($this, $methodName)) {
             return $this->$methodName();
         }
@@ -351,10 +354,10 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         $fields = static::fields();
 
         // Проверка на наличие связей
-        if (isset($fields[$column]) && $fields[$column]['type'] == 'link') {
-            $list = (array)$fields[$column]['link'];
+        if (isset($fields[$name]) && $fields[$name]['type'] == 'link') {
+            $list = (array)$fields[$name]['link'];
 
-            $localkey = !empty($list['localKey']) ? $list['localKey'] : $column;
+            $localkey = !empty($list['localKey']) ? $list['localKey'] : $name;
             // Один ко многим
             if (in_array($list['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
                 return !empty($this->_data[$localkey]);
@@ -362,34 +365,41 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
 
             // Многие ко многим
             if (in_array($list['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
-                return !empty($this->_linkData[$column]);
+                return !empty($this->_linkData[$name]);
 
             }
         }
 
-        if (isset($this->_data[$column])) {
+        if (isset($this->_data[$name])) {
             return true;
         }
 
-        if (isset($this->_extraData[$column])) {
+        if (isset($this->_extraData[$name])) {
             return true;
+        }
+
+        try {
+            return $this->__get($name) !== null;
+        } catch (Exception $e) {
+            return false;
         }
 
         return false;
     }
 
     /**
+     * Sets a property to be null.
      * unset() handler for object properties.
      *
-     * @param string $column Column name
+     * @param string $name The property name
      */
-    public function __unset($column) {
-        $methodName = 'unset' . ucfirst($column);
+    public function __unset($name) {
+        $methodName = 'unset' . ucfirst($name);
         if (method_exists($this, $methodName)) {
             return $this->$methodName();
         }
 
-        $setter = 'set' . ucfirst($column);
+        $setter = 'set' . ucfirst($name);
         if (method_exists($this, $setter)) {
             $this->$setter(null);
             return;
@@ -398,10 +408,10 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         $fields = static::fields();
 
         // Проверка на наличие связей
-        if (isset($fields[$column]) && $fields[$column]['type'] == 'link') {
-            $list = (array)$fields[$column]['link'];
+        if (isset($fields[$name]) && $fields[$name]['type'] == 'link') {
+            $list = (array)$fields[$name]['link'];
 
-            $localkey = !empty($list['localKey']) ? $list['localKey'] : $column;
+            $localkey = !empty($list['localKey']) ? $list['localKey'] : $name;
             // Один ко многим
             if (in_array($list['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
                 unset($this->_data[$localkey]);
@@ -409,12 +419,12 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
 
             // Многие ко многим
             if (in_array($list['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
-                unset($this->_linkData[$column]);
+                unset($this->_linkData[$name]);
             }
         }
 
-        if (isset($this->_data[$column])) unset($this->_data[$column]);
-        if (isset($this->_extraData[$column])) unset($this->_extraData[$column]);
+        if (isset($this->_data[$name])) unset($this->_data[$name]);
+        if (isset($this->_extraData[$name])) unset($this->_extraData[$name]);
     }
 
     /**
