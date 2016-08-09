@@ -220,6 +220,11 @@ abstract class Som_Model_Abstract extends Component
      */
     public function __isset($name)
     {
+        $methodName = 'isset' . ucfirst($name);
+        if (method_exists($this, $methodName)) {
+            return $this->$methodName();
+        }
+
         $getter = 'get' . ucfirst($name);
         if (method_exists($this, $getter)) {
             return $this->$getter() !== null;
