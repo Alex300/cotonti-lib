@@ -185,7 +185,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
             if (in_array($list['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
                 if (!empty($this->_linkData[$name]) && is_array($this->_linkData[$name]) && count($this->_linkData[$name]) > 0) {
                     // ХЗ как лучше, find или в цикле getById (getById кешируется на время выполенния, но за раз много запрсов)
-                    return $modelName::find(array(
+                    return $modelName::findByCondition(array(
                         array( $modelName::primaryKey(), $this->_linkData[$name] )
                     ), 0, 0, array($modelName::primaryKey()));
                 } else {
@@ -606,10 +606,30 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      *
      * @return Som_Model_ActiveRecord[]
      */
-    public static function find($conditions = array(), $limit = 0, $offset = 0, $order = '')
+    public static function findByCondition($conditions = array(), $limit = 0, $offset = 0, $order = '')
     {
         $res = static::fetch($conditions, $limit, $offset, $order);
         return $res;
+    }
+
+    /**
+     * Retrieve all existing objects from database
+     *
+     * @param mixed $conditions Numeric array of SQL WHERE conditions or a single
+     *                           condition as a string
+     * @param int $limit Maximum number of returned objects
+     * @param int $offset Offset from where to begin returning objects
+     * @param string $order Column name to order on
+     *
+     * @return Som_Model_ActiveRecord[]
+     *
+     * @deprecated. Use Som_Model_ActiveRecord::findByCondition() instead
+     *
+     * This method will return a Query Object in future releases
+     */
+    public static function find($conditions = array(), $limit = 0, $offset = 0, $order = '')
+    {
+        return static::findByCondition($conditions, $limit, $offset, $order);
     }
 
     /**
@@ -637,7 +657,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         /** @var Som_Model_ActiveRecord $className */
         $className = get_called_class();
 
-        $items = $className::find($conditions, $limit, $offset, $order);
+        $items = $className::findByCondition($conditions, $limit, $offset, $order);
         if(!$items) return array();
 
         $ret = array();
@@ -897,7 +917,27 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         $this->afterDelete();
 
         $this->_data[static::primaryKey()] = null;
-        unset($this);
+
+        // Free resources
+        if(!empty($this->_extraData)) {
+            foreach ($this->_extraData as $key => $val) {
+                unset($this->_extraData[$key]);
+            }
+        }
+
+        if(!empty($this->_data)) {
+            foreach ($this->_data as $key => $val) {
+                unset($this->_data[$key]);
+            }
+        }
+
+        if(!empty($this->_oldData)) {
+            foreach ($this->_oldData as $key => $val) {
+                unset($this->_oldData[$key]);
+            }
+        }
+
+        unset($this->_errors, $this->_linkData);
 
         return true;
     }
