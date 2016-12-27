@@ -4,10 +4,10 @@
 Code=cotontilib
 Name=Cotonti Lib
 Description=Additional API for extensions and themes
-Version=2.0.0
-Date=2016-05-04
+Version=2.0.1
+Date=2016-12-25
 Author=Kalnov Alexey
-Copyright=2014-2016 Portal30 Studio http://portal30.ru
+Copyright=(c) 2014-2016 Portal30 Studio http://portal30.ru
 Notes=
 Auth_guests=R
 Lock_guests=W12345A
