@@ -1427,6 +1427,15 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
     }
     // ==== /Методы для Валидации ====
 
+
+    /**
+     * Get current adapter
+     * @return Som_Model_Mapper_Abstract
+     */
+    public static function adapter() {
+        return static::$_db;
+    }
+
     /**
      * Adapter Factory
      * @param string $db connection name
