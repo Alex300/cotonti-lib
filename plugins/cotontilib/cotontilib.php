@@ -9,14 +9,10 @@ Hooks=standalone
  *  Cotonti Lib plugin for Cotonti Siena
  *
  * @package Cotonti Lib
- * @author  Kalnov Alexey    <kalnovalexey@yandex.ru>
+ * @author Kalnov Alexey <kalnovalexey@yandex.ru>
  * @copyright © Portal30 Studio http://portal30.ru
  */
 defined('COT_CODE') or die('Wrong URL.');
-
-// Права и так проверяются в system/plugin.php
-//list($usr['auth_read'], $usr['auth_write'], $usr['isadmin']) = cot_auth('plug', cot::$env['ext'], 'RWA');
-//cot_block($usr['auth_read']);
 
 // Self requirements
 //require_once cot_incfile(cot::$env['ext'], 'plug');
@@ -32,14 +28,23 @@ if (class_exists($controllerName)) {
     $controller = new $controllerName();
 
     if(!$a) $a = cot_import('a', 'P', 'TXT');
+    $action = $a;
+    if(!empty($action) && mb_strpos($action, '-') !== false) {
+        $action = explode('-', $action);
+        $tmp = array_shift($action);
+        $action = array_map('mb_ucfirst', $action);
+        $action = $tmp.implode('', $action);
+    }
 
     /* Perform the Request task */
-    $currentAction = $a.'Action';
-    if (!$a && method_exists($controller, 'indexAction')){
+    $currentAction = $action.'Action';
+    if (!$a && method_exists($controller, 'indexAction')) {
         $outContent = $controller->indexAction();
-    }elseif (method_exists($controller, $currentAction)){
+
+    } elseif (method_exists($controller, $currentAction)) {
         $outContent = $controller->$currentAction();
-    }else{
+
+    } else {
         // Error page
         cot_die_message(404);
         exit;
