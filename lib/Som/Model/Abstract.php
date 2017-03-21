@@ -523,30 +523,30 @@ abstract class Som_Model_Abstract extends Component
     }
 
     /**
-     * Проверяет модель на наличие ошибок
-     * Этот метод полезно переопределять для создания проверок спецефичных для конкретной модели
+     * Performs the model data validation.
+     * You may override this method in your models if you need to create special validation
      *
-     * @param array $validateFields Поля для проверки, проверить все, если NULL
-     * @param bool  $errorMessages Выводить системные сообщения об ошибках
-     * @param bool  $clearErrors whether to call [[clearErrors()]] before performing validation
+     * This method will call [[beforeValidate()]] and [[afterValidate()]] before and
+     * after the actual validation, respectively. If [[beforeValidate()]] returns false,
+     * the validation will be cancelled and [[afterValidate()]] will not be called.
+     *
+     * @param array $validateFields list of fields that should be validated. If NULL - all fields will be validated.
+     * @param bool  $errorMessages  whether to call cot_error() for found errors
+     * @param bool  $clearErrors    whether to call [[clearErrors()]] before performing validation
      *
      * @return bool
      * @throws Exception
+     *
      * @todo дописать метод
      */
     public function validate($validateFields = null, $errorMessages = null, $clearErrors = true)
     {
-        if ($clearErrors) {
-            $this->clearErrors();
-        }
+        if ($clearErrors) $this->clearErrors();
 
-        if (!$this->beforeValidate($validateFields)) {
-            return false;
-        }
+        if (!$this->beforeValidate()) return false;
 
-        if (is_null($errorMessages)) {
-            $errorMessages = $this->showValidateErrors;
-        }
+        if (is_null($errorMessages)) $errorMessages = $this->showValidateErrors;
+
         $validators = $this->validators();
         $fields = static::fields();
 

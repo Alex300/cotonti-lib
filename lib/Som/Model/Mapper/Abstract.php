@@ -195,6 +195,7 @@ abstract class Som_Model_Mapper_Abstract
      * @param string $query The SQL statement to prepare and execute.
      * @param array $parameters An array of values to be binded as input parameters to the query. PHP int parameters will beconsidered as PDO::PARAM_INT, others as PDO::PARAM_STR.
      * @return PDOStatement
+     * @throws Exception
      */
     public function query($query, $parameters = array())
     {
@@ -211,6 +212,7 @@ abstract class Som_Model_Mapper_Abstract
                 $array = $this->_adapter->errorInfo();
                 throw new Exception('SQL Error: ' . $array[2]);
             }
+
         } else {
             $result = $this->_adapter->query($query);
             if ($result === false) {
@@ -234,31 +236,32 @@ abstract class Som_Model_Mapper_Abstract
 
 
     /**
-     * Получить записи
-     * @access public
+     * Get a list of active record models that match the specified condition
      *
-     * @param array $conditions
+     * @param  array $conditions
      * @param  int $limit
      * @param  int $offset
-     * @param array|string $order
-     * @param array $columns
-     * @return bool|Som_Model_Abstract[]
+     * @param  array|string $order
+     * @param  array $columns
+     * @return bool|Som_Model_ActiveRecord[]
      * @throws Exception
      */
     public function fetch($conditions = array(), $limit = 0, $offset = 0, $order = '', $columns = Array())
     {
         $tq = $this->tableQuote;
         $table = $this->_dbinfo['tbname'];
-        /** @var Som_Model_Abstract $model_name */
+        /** @var Som_Model_ActiveRecord $model_name */
         $model_name = $this->_dbinfo['class'];
 
         $joins = array();
         $addColumns = array();
 
-        if (empty($columns))
+        if (empty($columns)) {
             $calssCols = $model_name::getColumns();
-        else
+
+        } else {
             $calssCols = $columns;
+        }
 
         if (!empty($model_name::$fetchJoins)) $addJoins = $model_name::$fetchJoins;
         if (!empty($model_name::$fetchColumns)) $addColumns = $model_name::$fetchColumns;
@@ -300,8 +303,8 @@ abstract class Som_Model_Mapper_Abstract
     }
 
     /**
-     * Получить количество строк, удовлетворяющих условию
-     * @access public
+     * Get the number of records that match the specified condition
+     *
      * @param string $table
      * @param $conditions
      *
@@ -314,7 +317,7 @@ abstract class Som_Model_Mapper_Abstract
         if (empty($table)){
             $table = $this->_dbinfo['tbname'];
             if(!empty($this->_dbinfo['class'])){
-                /** @var Som_Model_Abstract $model_name */
+                /** @var Som_Model_ActiveRecord $model_name */
                 $model_name = $this->_dbinfo['class'];
                 if (!empty($model_name::$fetchJoins)) $addJoins = $model_name::$fetchJoins;
             }
@@ -343,7 +346,7 @@ abstract class Som_Model_Mapper_Abstract
      * Performs single row INSERT if $data is an associative array,
      * performs multi-row INSERT if $data is a 2D array (numeric => assoc)
      *
-     * @param string|\Som_Model_Abstract $table_name Table name
+     * @param string|\Som_Model_ActiveRecord $table_name Table name
      * @param array|bool $data Associative or 2D array containing data for insertion.
      * @param bool $insert_null Insert SQL NULL for empty values rather than ignoring them.
      * @param bool $ignore Ignore duplicate key errors on insert
@@ -356,7 +359,7 @@ abstract class Som_Model_Mapper_Abstract
         $tq = $this->tableQuote;
 
         $pkey = '';
-        if ($table_name instanceof Som_Model_Abstract) {
+        if ($table_name instanceof Som_Model_ActiveRecord) {
             $model = $table_name;
             $table_name = $this->_dbinfo['tbname'];
             $pkey = $this->_dbinfo['pkey'];
@@ -477,7 +480,7 @@ abstract class Som_Model_Mapper_Abstract
      * - PHP NULL => SQL NULL
      * - 'NOW()' => SQL NOW()
      *
-     * @param string|\Som_Model_Abstract $table_name Table name
+     * @param string|\Som_Model_ActiveRecord $table_name Table name
      * @param array|bool $data Associative or 2D array containing data for update
      * @param string $condition Body of SQL WHERE clause
      * @param array $parameters Array of statement input parameters, see http://www.php.net/manual/en/pdostatement.execute.php
@@ -583,16 +586,17 @@ abstract class Som_Model_Mapper_Abstract
     /**
      * Performs simple SQL DELETE query and returns number of removed items.
      *
-     * @param string $table_name |\Som_Model_Abstract Table name
+     * @param string $table_name |\Som_Model_ActiveRecord Table name
      * @param string $condition Body of WHERE clause
      * @param array $parameters Array of statement input parameters, see http://www.php.net/manual/en/pdostatement.execute.php
      * @return int Number of records removed on success or FALSE on error
+     * @throws Exception
      */
     public function delete($table_name, $condition = '', $parameters = array()) {
         $model = null;
         $tq = $this->tableQuote;
 
-        if ($table_name instanceof Som_Model_Abstract) {
+        if ($table_name instanceof Som_Model_ActiveRecord) {
             $model = $table_name;
             $table_name = $this->_dbinfo['tbname'];
             $pkey = $this->_dbinfo['pkey'];
@@ -1004,8 +1008,9 @@ abstract class Som_Model_Mapper_Abstract
     }
 
     /**
-     * Загрузить связи
-     * @param string|Som_Model_Abstract $xModel
+     * Load relationship
+     *
+     * @param string|Som_Model_ActiveRecord $xModel
      * @param $id
      * @param string $fieldName
      * @return array|bool|null
@@ -1017,7 +1022,7 @@ abstract class Som_Model_Mapper_Abstract
         $tq = $this->tableQuote;
 
         if (is_string($xModel) || ($xModel instanceof Som_Model_Abstract)) {
-            /** @var Som_Model_Abstract $xModel */
+            /** @var Som_Model_ActiveRecord $xModel */
             $xPk = $xModel::primaryKey();
             $linkModelDbInfo = $xModel::getDbConfig();
 
@@ -1028,7 +1033,7 @@ abstract class Som_Model_Mapper_Abstract
 
         $tableName = $this->_dbinfo['tbname'];
 
-        // Убираем префиксы имен таблиц
+        // Remove prefixes of table names
         $tableName  = preg_replace("/^$db_x/iu", '', $tableName);
         $xTableName = preg_replace("/^$db_x/iu", '', $xTableName);
 
@@ -1058,8 +1063,9 @@ abstract class Som_Model_Mapper_Abstract
     }
 
     /**
-     * Сохранить связи
-     * @param string|Som_Model_Abstract $xModel
+     * Save relationship between two models
+     *
+     * @param string|Som_Model_ActiveRecord $xModel
      * @param $id
      * @param $data
      * @param string $fieldName
@@ -1068,8 +1074,8 @@ abstract class Som_Model_Mapper_Abstract
      */
     protected function saveXRef($xModel, $id, $data, $fieldName = '')
     {
-        if (is_string($xModel) || ($xModel instanceof Som_Model_Abstract)) {
-            /** @var Som_Model_Abstract $xModel */
+        if (is_string($xModel) || ($xModel instanceof Som_Model_ActiveRecord)) {
+            /** @var Som_Model_ActiveRecord $xModel */
             $xPk = $xModel::primaryKey();
             $linkModelDbInfo = $xModel::getDbConfig();
 
@@ -1085,7 +1091,7 @@ abstract class Som_Model_Mapper_Abstract
     }
 
     /**
-     * Сохранить связи между таблицами
+     * Save relationship between two DB tables
      *
      * @param $table
      * @param $rTable
@@ -1097,11 +1103,12 @@ abstract class Som_Model_Mapper_Abstract
      * @return bool
      * @throws Exception
      */
-    public function saveRelations($table, $rTable, $id, $data, $fieldName = '',  $pkey = 'id', $rPkey = 'id') {
+    public function saveRelations($table, $rTable, $id, $data, $fieldName = '',  $pkey = 'id', $rPkey = 'id')
+    {
         global $db_x;
         $tq = $this->tableQuote;
 
-        // Убираем префиксы имен таблиц
+        // Remove prefixes of table names
         $table  = preg_replace("/^$db_x/iu", '', $table);
         $rTable = preg_replace("/^$db_x/iu", '', $rTable);
 
@@ -1200,22 +1207,24 @@ abstract class Som_Model_Mapper_Abstract
     }
 
     /**
-     * Удалить связи между моделями
+     * Destroys the relationship between two models.
      *
-     * @param string|Som_Model_Abstract $xModel
+     * @param string|Som_Model_ActiveRecord $xModel
      * @param $id
      * @param string $fieldName
      * @return bool
      */
     protected function deleteXRef($xModel, $id, $fieldName = '')
     {
-        if (is_string($xModel) || ($xModel instanceof Som_Model_Abstract)) {
-            /** @var Som_Model_Abstract $xModel */
+        if (is_string($xModel) || ($xModel instanceof Som_Model_ActiveRecord)) {
+            /** @var Som_Model_ActiveRecord $xModel */
             $xPk        = $xModel::primaryKey();
             $xTableName = $xModel::tableName();
-        }else{
+
+        } else {
             return false;
         }
+
         $tableName  = $this->_dbinfo['tbname'];
         $pk         = $this->_dbinfo['pkey'];
 
@@ -1223,11 +1232,11 @@ abstract class Som_Model_Mapper_Abstract
     }
 
     /**
-     * Удалить связи между таблицами
+     * Destroys the relationship between two DB tables.
      *
      * @param string $table
      * @param string $rTable        Связь с этой таблицей будет удалена
-     * @param int    $id            Значение первичного ключа из $table
+     * @param int    $id            Primary key value from the $table
      * @param string $fieldName
      * @param string $pkey
      * @param string $rPkey
@@ -1237,7 +1246,7 @@ abstract class Som_Model_Mapper_Abstract
     {
         global $db_x;
 
-        // Убираем префиксы имен таблиц
+        // Remove prefixes of table names
         $table = preg_replace("/^$db_x/iu", '', $table);
         $rTable = preg_replace("/^$db_x/iu", '', $rTable);
 

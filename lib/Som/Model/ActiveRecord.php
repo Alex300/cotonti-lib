@@ -608,8 +608,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      */
     public static function findByCondition($conditions = array(), $limit = 0, $offset = 0, $order = '')
     {
-        $res = static::fetch($conditions, $limit, $offset, $order);
-        return $res;
+        return static::fetch($conditions, $limit, $offset, $order);
     }
 
     /**
@@ -722,10 +721,11 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
 
         if ($this->getId() === null) {
 
-            // Добавить новый
+            // Add new record to DB
             $id = $this->insert();
+
         } else {
-            // Сохранить существующий
+            // Update existing record
             $id = $this->getId();
             $this->update();
         }
@@ -756,7 +756,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         $className = get_called_class();
         $fields = static::fields();
 
-        // Заполнение волшебных полей
+        // Fill magic fields
         if(array_key_exists('created',    $fields)) $this->_data['created']    = date('Y-m-d H:i:s', cot::$sys['now']);
         if(array_key_exists('created_by', $fields)) $this->_data['created_by'] = cot::$usr['id'];
         if(array_key_exists('updated',    $fields)) $this->_data['updated']    = date('Y-m-d H:i:s', cot::$sys['now']);
@@ -810,7 +810,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         $className = get_called_class();
         $fields = static::fields();
 
-        // Заполнение волшебных полей
+        // Fill magic fields
         if(array_key_exists('updated',    $fields)) $this->_data['updated']    = date('Y-m-d H:i:s', cot::$sys['now']);
         if(array_key_exists('updated_by', $fields)) $this->_data['updated_by'] = cot::$usr['id'];
 
@@ -1269,30 +1269,34 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         return false;
     }
 
+
     /**
-     * Проверяет модель на наличие ошибок
-     * Этот метод полезно переопределять для создания проверок спецефичных для конкретной модели
-     * @param array $validateFields Поля для проверки, проверить все, если NULL
-     * @param bool $errorMessages Выводить системные сообщения об ошибках
-     * @param bool $clearErrors
+     * Performs the model data validation.
+     * You can override this method in your models if you need to create special validation
+     *
+     * @param array $validateFields list of fields that should be validated. If NULL - all fields will be validated.
+     * @param bool  $errorMessages  whether to call \cot_error() for found errors
+     * @param bool  $clearErrors    whether to call [[clearErrors()]] before performing validation
+     *
      * @return bool
      * @throws Exception
+     *
+     * @see \Som_Model_Abstract::validate()
+     *
      * @todo дописать метод
      */
-    public function validate($validateFields = null, $errorMessages = true, $clearErrors = true)
+    public function validate($validateFields = null, $errorMessages = null, $clearErrors = true)
     {
-        if ($clearErrors) {
-            $this->clearErrors();
-        }
+        if ($clearErrors) $this->clearErrors();
 
-        if (!$this->beforeValidate()) {
-            return false;
-        }
+        if (!$this->beforeValidate()) return false;
+
+        if (is_null($errorMessages)) $errorMessages = $this->showValidateErrors;
 
         $validators = $this->validators();
         $fields = static::fields();
 
-        foreach($this->requiredFields() as $field){
+        foreach($this->requiredFields() as $field) {
             $validators[] = array($field, 'required');
         }
 
@@ -1351,14 +1355,14 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
                             if ($res !== true) $this->_errors[$name][] = $res;
 
                         } catch (Exception $e) {
-                            throw new Exception("Не правильный CallBack validator для поля '{$name}'");
+                            throw new Exception("Wrong CallBack validator for field '{$name}'");
 
                         }
 
                     } elseif (is_string($validator)) {
                         switch (mb_strtolower($validator)) {
                             case 'required':
-                                $this->_requiredFields[$name] = 1;
+                                //$this->_requiredFields[$name] = 1;
                                 if (($value === '') || (is_null($value))) {
                                     $fieldName = $name;
                                     $tmp = static::fieldLabel($name);
@@ -1377,6 +1381,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
                     }
                 }
             }
+
             // Проверка на соотвествие типу
             if (!empty($fields[$name])) {
                 switch (mb_strtolower($fields[$name]['type'])) {
@@ -1390,7 +1395,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
             }
         }
 
-        // Системные сообщения об ошибках
+        // System error messages
         if(count($this->_errors) > 0 && $errorMessages) {
             foreach($this->_errors as $name => $errors) {
                 if(!empty($errors)) {
