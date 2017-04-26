@@ -93,7 +93,8 @@ class ListFilter
      *
      * @see configure
      */
-    public function __construct($config = null) {
+    public function __construct($config = null)
+    {
         $this->noMatter = cot::$R['code_option_empty'];
 
         if(!empty($config)) $this->setConfig($config);
@@ -103,7 +104,8 @@ class ListFilter
 
     public function init() { }
 
-    public function setConfig($config) {
+    public function setConfig($config)
+    {
         if (is_string($config)) $config = require($config . '.php');
 
         if (is_array($config)) {
@@ -118,17 +120,32 @@ class ListFilter
     }
 
     /**
+     * Get current filter list with values
+     * @return array
+     */
+    public function getFilters()
+    {
+        return $this->filters;
+    }
+
+    public function getFields()
+    {
+        return $this->fields;
+    }
+
+    /**
      * Формирует условие выборки для SOM
      * @return array
      */
-    public function condition() {
+    public function condition()
+    {
         $cond = array();
 
         $filtersArr = cot_import($this->getParam, 'G', 'ARR');
         if(empty($filtersArr)) return $cond;
 
         foreach($filtersArr as $field => $filter) {
-            // Используем только разрешенные поля
+            // Using allowed fields only
             if(!in_array($field, $this->allowedFields)) {
                 unset($filtersArr[$field]);
                 continue;
@@ -141,7 +158,8 @@ class ListFilter
                     $fData = array();
                     $tmp = $this->genCondition($field, $filtersArr[$field]['checklistbox'], 'array');
                     if (!empty($tmp)) $cond[] = $tmp;
-                }else {
+
+                } else {
                     unset($filtersArr[$field]['checklistbox']);
                 }
             }
@@ -151,7 +169,8 @@ class ListFilter
                     $filtersArr[$field]['is'] = $this->importValue($filtersArr[$field]['is'], $fieldType);
                     $tmp = $this->genCondition($field, $filtersArr[$field]['is'], 'is');
                     if (!empty($tmp)) $cond[] = $tmp;
-                }else {
+
+                } else {
                     unset($filtersArr[$field]['is']);
                 }
             }
@@ -161,7 +180,8 @@ class ListFilter
                     $filtersArr[$field]['like'] = $this->importValue($filtersArr[$field]['like'], $fieldType);
                     $tmp = $this->genCondition($field, $filtersArr[$field]['like'], 'like');
                     if (!empty($tmp)) $cond[] = $tmp;
-                }else {
+
+                } else {
                     unset($filtersArr[$field]['like']);
                 }
             }
@@ -173,6 +193,7 @@ class ListFilter
                     $filtersArr[$field]['more'] = $this->importValue($filtersArr[$field]['more'], $fieldType);
                     $tmp = $this->genCondition($field, $filtersArr[$field]['more'], 'more');
                     if (!empty($tmp)) $cond[] = $tmp;
+
                 } else {
                     unset($filtersArr[$field]['more']);
                 }
@@ -184,7 +205,8 @@ class ListFilter
                     $filtersArr[$field]['less'] = $this->importValue($filtersArr[$field]['less'], $fieldType);
                     $tmp = $this->genCondition($field, $filtersArr[$field]['less'], 'less');
                     if (!empty($tmp)) $cond[] = $tmp;
-                }else {
+
+                } else {
                     unset($filtersArr[$field]['less']);
                 }
             }
@@ -194,7 +216,8 @@ class ListFilter
                     $fData = array();
                     $tmp = $this->genCondition($field, $filtersArr[$field]['radio'], 'is');
                     if (!empty($tmp)) $cond[] = $tmp;
-                }else {
+
+                } else {
                     unset($filtersArr[$field]['radio']);
                 }
             }
@@ -204,7 +227,8 @@ class ListFilter
                     $fData = array();
                     $tmp = $this->genCondition($field, $filtersArr[$field]['radio'], 'is');
                     if (!empty($tmp)) $cond[] = $tmp;
-                }else {
+
+                } else {
                     unset($filtersArr[$field]['radio']);
                 }
             }
@@ -217,39 +241,40 @@ class ListFilter
         return $cond;
     }
 
-    protected function genCondition($field, $val, $fType) {
+    protected function genCondition($field, $val, $fType)
+    {
 
         if($val == 'nullval') return null;
 
         switch ($fType) {
             case 'more':
                 $this->active = true;
-                $this->activeFilters[] = $field;
+                if(!in_array($field, $this->activeFilters)) $this->activeFilters[] = $field;
                 return array($field, $val, '>=');
                 break;
 
             case 'less':
                 $this->active = true;
-                $this->activeFilters[] = $field;
+                if(!in_array($field, $this->activeFilters)) $this->activeFilters[] = $field;
                 return array($field, $val, '<=');
                 break;
 
             case 'array':
                 $this->active = true;
-                $this->activeFilters[] = $field;
+                if(!in_array($field, $this->activeFilters)) $this->activeFilters[] = $field;
                 return array($field, $val);
                 break;
 
             case 'like':
                 $this->active = true;
-                $this->activeFilters[] = $field;
+                if(!in_array($field, $this->activeFilters)) $this->activeFilters[] = $field;
                 return array($field, '*'.$val.'*');
                 break;
 
             case 'is':
             default:
                 $this->active = true;
-                $this->activeFilters[] = $field;
+            if(!in_array($field, $this->activeFilters)) $this->activeFilters[] = $field;
                 return array($field, $val);
                 break;
         }
@@ -262,7 +287,8 @@ class ListFilter
      * @param $field
      * @return bool
      */
-    public function isActive($field) {
+    public function isActive($field)
+    {
         return in_array($field, $this->activeFilters);
     }
 
@@ -270,7 +296,8 @@ class ListFilter
      * Параметры для генерации URL'а, например для пагинации
      * @return array
      */
-    public function urlParams() {
+    public function urlParams()
+    {
         $params = array();
 
         if(empty($this->filters)) return $params;
@@ -353,11 +380,13 @@ class ListFilter
      *
      * @return string the ID generated based on name.
      */
-    public static function getIdByName($name) {
+    public static function getIdByName($name)
+    {
         return str_replace(array('[]','][','[',']',' '), array('','_','_','','_'), $name);
     }
 
-    protected function commonAttributes($field, $attributes = array()) {
+    protected function commonAttributes($field, $attributes = array())
+    {
 
         if(empty($attributes)) $attributes = array();
         foreach($attributes as $key => $val) {
@@ -385,7 +414,8 @@ class ListFilter
 
     // ===== Вывод элементов фильтров ======
 
-    public function checklistbox($field, $config = array()) {
+    public function checklistbox($field, $config = array())
+    {
         $filter = 'checklistbox';
         $elName = $this->getParam."[{$field}][{$filter}]";
         //if(!isset($config['id']) || $config['id'] == '') $config['id'] = $this->getIdByName($elName);
@@ -414,7 +444,8 @@ class ListFilter
      *
      * @return string
      */
-    public function is($field, $config = array()) {
+    public function is($field, $config = array())
+    {
         $filter = 'is';
         $elName = $this->getParam."[{$field}][{$filter}]";
 
@@ -438,7 +469,8 @@ class ListFilter
      *
      * @return string
      */
-    public function like($field, $config = array()) {
+    public function like($field, $config = array())
+    {
         $filter = 'like';
         $elName = $this->getParam."[{$field}][{$filter}]";
 
@@ -458,7 +490,8 @@ class ListFilter
      *      Может содержать поле 'data' - это данные для заполненния поля
      * @return string
      */
-    public function moreLess($field, $config = array(), $filter = 'more') {
+    public function moreLess($field, $config = array(), $filter = 'more')
+    {
         $elName = $this->getParam."[{$field}][{$filter}]";
         if(!isset($config['id']) || $config['id'] == '') $config['id'] = $this->getIdByName($elName);
 
@@ -514,7 +547,8 @@ class ListFilter
      *      Может содержать поле 'data' - это данные для заполненния поля
      * @return string
      */
-    function more($field, $config = array()){
+    function more($field, $config = array())
+    {
         return $this->moreLess($field, $config, 'more');
     }
 
@@ -529,7 +563,8 @@ class ListFilter
         return $this->moreLess($field, $config, 'less');
     }
 
-    public function radio($field, $config = array(), $filter = 'radio') {
+    public function radio($field, $config = array(), $filter = 'radio')
+    {
         $elName = $this->getParam."[{$field}][{$filter}]";
 
         $data = array();
@@ -556,7 +591,8 @@ class ListFilter
      * @param string $filter
      * @return string
      */
-    protected function select($field, $config = array(), $filter = 'select') {
+    protected function select($field, $config = array(), $filter = 'select')
+    {
         $elName = $this->getParam."[{$field}][{$filter}]";
 
         $attributes = $this->commonAttributes($field, $config);
@@ -570,9 +606,11 @@ class ListFilter
         $no_matter = $this->noMatter;
         if(isset($config['noMatter'])) {
             $no_matter = $config['noMatter'];
+
         } elseif(isset($this->fields[$field]) && isset($this->fields[$field]['noMatter'])) {
             $no_matter = $this->fields[$field]['noMatter'];
         }
+
         $options = array('nullval' => $no_matter);
         if(!empty($data)) {
             foreach($data as $key => $val) {
@@ -598,7 +636,8 @@ class ListFilter
      *
      * @return string
      */
-    protected function text($field, $config = array(), $filter = 'input') {
+    protected function text($field, $config = array(), $filter = 'input')
+    {
         $elName = $this->getParam."[{$field}][{$filter}]";
 
         $attributes = $this->commonAttributes($field, $config);
