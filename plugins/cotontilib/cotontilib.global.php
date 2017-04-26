@@ -25,7 +25,8 @@ Loader::register();
  * @param string $str The input string.
  * @return string the resulting string.
  */
-function mb_ucfirst($str) {
+function mb_ucfirst($str)
+{
     $fc = mb_strtoupper(mb_substr($str, 0, 1));
     return $fc.mb_substr($str, 1);
 }
@@ -35,8 +36,11 @@ function mb_ucfirst($str) {
  *
  * @param mixed $var[,$var1],[.. varN]
  */
-function var_dump_() {
-    echo '<div style="z-index:1000;opacity:0.8"><pre style="color:black;background-color:white;">';
+function var_dump_()
+{
+    static $cnt = 0;
+    $cnt++;
+    echo '<div id="var-dump-'.$cnt.'" class="var-dump" style="z-index:1000;opacity:0.8"><pre style="color:black;background-color:white;">';
     $params = func_get_args();
     call_user_func_array('var_dump', $params);
     echo '</pre></div>';
@@ -48,7 +52,8 @@ function var_dump_() {
  *
  * @param mixed $var[,$var1],[.. varN]
  */
-function var_dump__() {
+function var_dump__()
+{
     cot_sendheaders();
     $params = func_get_args();
     call_user_func_array('var_dump_', $params);
