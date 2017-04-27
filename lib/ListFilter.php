@@ -153,14 +153,14 @@ class ListFilter
             $fieldType = $this->fieldType($field);
             if(empty($fieldType)) $fieldType = 'text';    // По умолчанию
 
-            if(isset($filtersArr[$field]['checklistbox'])) {
-                if (is_array($filtersArr[$field]['checklistbox']) && !empty($filtersArr[$field]['checklistbox'])) {
+            if(isset($filtersArr[$field]['arr'])) {
+                if (is_array($filtersArr[$field]['arr']) && !empty($filtersArr[$field]['arr'])) {
                     $fData = array();
-                    $tmp = $this->genCondition($field, $filtersArr[$field]['checklistbox'], 'array');
+                    $tmp = $this->genCondition($field, $filtersArr[$field]['arr'], 'array');
                     if (!empty($tmp)) $cond[] = $tmp;
 
                 } else {
-                    unset($filtersArr[$field]['checklistbox']);
+                    unset($filtersArr[$field]['arr']);
                 }
             }
 
@@ -416,7 +416,7 @@ class ListFilter
 
     public function checklistbox($field, $config = array())
     {
-        $filter = 'checklistbox';
+        $filter = 'arr';
         $elName = $this->getParam."[{$field}][{$filter}]";
         //if(!isset($config['id']) || $config['id'] == '') $config['id'] = $this->getIdByName($elName);
 
