@@ -4,6 +4,7 @@
 Code=cotontilib
 Name=Cotonti Lib
 Description=Additional API for extensions and themes
+Category=development-maintenance
 Version=2.0.1
 Date=2017-01-25
 Author=Kalnov Alexey

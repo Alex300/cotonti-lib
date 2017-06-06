@@ -3,7 +3,8 @@
  * View Class
  * @author Kalnov Alexey http://portal30.ru
  */
-class View{
+class View
+{
 
     private $_path = array();
     private $_strictVars = false;
@@ -222,7 +223,7 @@ class View{
      * Renders different messages on page
      *  wrapper for cot_display_messages()
      *
-     * @param bool $cache - "Просросить" сообщения об ошибках, чтобы подсвечивать элементы формы
+     * @param bool $cache - "Пробросить" сообщения об ошибках, чтобы подсвечивать элементы формы
      * @param string $tpl
      * @throws Exception
      * @return string
@@ -286,7 +287,7 @@ class View{
     }
 
     /**
-     * @param array|string $viewFile имя файла шаблона. Если не указано расширение или оно не входит в $_extensions,
+     * @param array|string $viewFile template file name. Если не указано расширение или оно не входит в $_extensions,
      *              будет использовано '.php'
      *              The default search order is:
      *                1) Current theme folder (plugins/ subdir for plugins, admin/ subdir for admin)
@@ -329,5 +330,4 @@ class View{
 
         if($this->messagesDisplayed) cot_clear_messages();
     }
-
 }
