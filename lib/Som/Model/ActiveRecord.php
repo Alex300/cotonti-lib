@@ -164,6 +164,14 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
             return $this->$methodName();
         }
 
+        // Behavior property
+        $this->ensureBehaviors();
+        foreach ($this->_behaviors as $behavior) {
+            if ($behavior->canGetProperty($name)) {
+                return $behavior->$name;
+            }
+        }
+
         $fields = static::fields();
 
         // Проверка на наличие связей
@@ -188,19 +196,15 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
                     return $modelName::findByCondition(array(
                         array( $modelName::primaryKey(), $this->_linkData[$name] )
                     ), 0, 0, array($modelName::primaryKey()));
+
                 } else {
                     return null;
                 }
-
             }
         }
 
-        if (isset($this->_data[$name])) {
-            return $this->_data[$name];
-        }
-        if (isset($this->_extraData[$name])) {
-            return $this->_extraData[$name];
-        }
+        if (isset($this->_data[$name]))       return $this->_data[$name];
+        if (isset($this->_extraData[$name]))  return $this->_extraData[$name];
 
         return null;
     }
@@ -211,7 +215,6 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      *
      * @param string $name Property name
      * @param mixed $value Property value
-     * @return mixed
      * @throws Exception
      */
     public function __set($name, $value)
@@ -259,9 +262,32 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
 
         }
 
-        $methodName = 'set' . ucfirst($name);
-        if ($methodName != 'setData' && method_exists($this, $methodName)) {
-            return $this->$methodName($value);
+        $setter = 'set' . ucfirst($name);
+        if ($setter != 'setData' && method_exists($this, $setter)) {
+            // set property
+            $this->$setter($value);
+            return;
+
+        } elseif (strncmp($name, 'on ', 3) === 0) {
+            // on event: attach event handler
+            $this->on(trim(substr($name, 3)), $value);
+            return;
+
+        } elseif (strncmp($name, 'as ', 3) === 0) {
+            // as behavior: attach behavior
+            $name = trim(substr($name, 3));
+            $this->attachBehavior($name, $value instanceof Behavior ? $value : new $value() );
+            return;
+
+        }
+
+        // Behavior property
+        $this->ensureBehaviors();
+        foreach ($this->_behaviors as $behavior) {
+            if ($behavior->canSetProperty($name)) {
+                $behavior->$name = $value;
+                return;
+            }
         }
 
         // если передали объект, Один ко многим
@@ -270,9 +296,11 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
             if ($link) {
                 if ($value instanceof $className) {
                     $value = $value->getId();
+
                 } else {
                     throw new Exception("Тип переданного значения не соответствует пипу поля. Должно быть: $className");
                 }
+
             } elseif (in_array($name, static::getColumns())) {
                 throw new Exception("Связь для поля '{$name}' не найдена");
             }
@@ -284,7 +312,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
             // Один ко многим
             if (in_array($link['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
                 $this->_data[$localkey] = $value;
-                return true;
+                return;
             }
             if (in_array($link['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
                 if (!is_array($value)) $value = array($value);
@@ -293,6 +321,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
                     // todo проверка типов
                     if ($valRow instanceof $className) {
                         $this->_linkData[$name][] = $valRow->getId();
+
                     } elseif ($valRow) {
                         $this->_linkData[$name][] = $valRow;
                     }
@@ -334,8 +363,6 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         } elseif (!$link) {
             $this->_extraData[$name] = $value;
         }
-
-        return true;
     }
 
     /**
@@ -349,8 +376,14 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
     public function __isset($name)
     {
         $methodName = 'isset' . ucfirst($name);
-        if (method_exists($this, $methodName)) {
-            return $this->$methodName();
+        if (method_exists($this, $methodName)) return $this->$methodName();
+
+        // Behavior property
+        $this->ensureBehaviors();
+        foreach ($this->_behaviors as $behavior) {
+            if ($behavior->canGetProperty($name)) {
+                return $behavior->$name !== null;
+            }
         }
 
         $fields = static::fields();
@@ -368,7 +401,6 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
             // Многие ко многим
             if (in_array($list['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
                 return !empty($this->_linkData[$name]);
-
             }
         }
 
@@ -378,11 +410,10 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         try {
             $tmp = $this->__get($name);
             return $tmp !== null;
+
         } catch (Exception $e) {
             return false;
         }
-
-        return false;
     }
 
     /**
@@ -395,13 +426,23 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
     {
         $methodName = 'unset' . ucfirst($name);
         if (method_exists($this, $methodName)) {
-            return $this->$methodName();
+            $this->$methodName();
+            return;
         }
 
         $setter = 'set' . ucfirst($name);
         if (method_exists($this, $setter)) {
             $this->$setter(null);
             return;
+        }
+
+        // Behavior property
+        $this->ensureBehaviors();
+        foreach ($this->_behaviors as $behavior) {
+            if ($behavior->canSetProperty($name)) {
+                $behavior->$name = null;
+                return;
+            }
         }
 
         $fields = static::fields();

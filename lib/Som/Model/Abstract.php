@@ -122,24 +122,18 @@ abstract class Som_Model_Abstract extends Component
         if (method_exists($this, $getter)) {
             // read property, e.g. getName()
             return $this->$getter();
-        } else {
-            // behavior property
-            $this->ensureBehaviors();
-            foreach ($this->_behaviors as $behavior) {
-                if ($behavior->canGetProperty($name)) {
-                    return $behavior->$name;
-                }
+        }
+
+        // Behavior property
+        $this->ensureBehaviors();
+        foreach ($this->_behaviors as $behavior) {
+            if ($behavior->canGetProperty($name)) {
+                return $behavior->$name;
             }
         }
 
         if (isset($this->_data[$name]))      return $this->_data[$name];
         if (isset($this->_extraData[$name])) return $this->_extraData[$name];
-
-//        if (method_exists($this, 'set' . ucfirst($name))) {
-//            throw new Exception_InvalidCall('Getting write-only property: ' . get_class($this) . '::' . $name);
-//        } else {
-//            throw new Exception_UnknownProperty('Getting unknown property: ' . get_class($this) . '::' . $name);
-//        }
 
         return null;
     }
@@ -166,34 +160,32 @@ abstract class Som_Model_Abstract extends Component
         if (method_exists($this, $setter)) {
             // set property
             $this->$setter($value);
-
             return;
+
         } elseif (strncmp($name, 'on ', 3) === 0) {
             // on event: attach event handler
             $this->on(trim(substr($name, 3)), $value);
-
             return;
+
         } elseif (strncmp($name, 'as ', 3) === 0) {
             // as behavior: attach behavior
             $name = trim(substr($name, 3));
             $this->attachBehavior($name, $value instanceof Behavior ? $value : new $value() );
-
             return;
-        } else {
-            // behavior property
-            $this->ensureBehaviors();
-            foreach ($this->_behaviors as $behavior) {
-                if ($behavior->canSetProperty($name)) {
-                    $behavior->$name = $value;
 
-                    return;
-                }
+        }
+
+        // Behavior property
+        $this->ensureBehaviors();
+        foreach ($this->_behaviors as $behavior) {
+            if ($behavior->canSetProperty($name)) {
+                $behavior->$name = $value;
+                return;
             }
         }
 
         if (in_array($name, static::getColumns())) {
             $this->_data[$name] = $value;
-
             return;
         }
 
@@ -217,18 +209,15 @@ abstract class Som_Model_Abstract extends Component
     public function __isset($name)
     {
         $methodName = 'isset' . ucfirst($name);
-        if (method_exists($this, $methodName)) {
-            return $this->$methodName();
-        }
+        if (method_exists($this, $methodName)) return $this->$methodName();
 
         try {
             $tmp = $this->__get($name);
             return $tmp !== null;
+
         } catch (Exception $e) {
             return false;
         }
-
-        return false;
     }
 
     /**
@@ -248,21 +237,22 @@ abstract class Som_Model_Abstract extends Component
     {
         $methodName = 'unset' . ucfirst($name);
         if (method_exists($this, $methodName)) {
-            return $this->$methodName();
+            $this->$methodName();
+            return;
         }
 
         $setter = 'set' . ucfirst($name);
         if (method_exists($this, $setter)) {
             $this->$setter(null);
             return;
-        } else {
-            // behavior property
-            $this->ensureBehaviors();
-            foreach ($this->_behaviors as $behavior) {
-                if ($behavior->canSetProperty($name)) {
-                    $behavior->$name = null;
-                    return;
-                }
+        }
+
+        // Behavior property
+        $this->ensureBehaviors();
+        foreach ($this->_behaviors as $behavior) {
+            if ($behavior->canSetProperty($name)) {
+                $behavior->$name = null;
+                return;
             }
         }
 

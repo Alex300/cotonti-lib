@@ -6,7 +6,7 @@ Order=4
 [END_COT_EXT]
 ==================== */
 /**
- * Cotonti Lib plugin for Cotonti
+ * Cotonti Lib plugin for Cotonti Siena
  *
  * @package Cotonti Lib
  * @author  Kalnov Alexey    <kalnovalexey@yandex.ru>
@@ -18,17 +18,78 @@ defined('COT_CODE') or die('Wrong URL.');
 require_once 'lib/Loader.php';
 Loader::register();
 
+include cot_langfile('cotontilib', 'plug');
+
+if(!function_exists('mb_ucfirst')) {
+    /**
+     * Make a string's first character uppercase
+     * @link http://php.net/manual/en/function.ucfirst.php
+     *
+     * @param string $str The input string.
+     * @return string the resulting string.
+     */
+    function mb_ucfirst($str)
+    {
+        $fc = mb_strtoupper(mb_substr($str, 0, 1));
+        return $fc . mb_substr($str, 1);
+    }
+}
+
+if(!function_exists('mb_lcfirst')) {
+    /**
+     * Make a string's first character lowercase
+     * @link http://php.net/manual/en/function.lcfirst.php
+     *
+     * @param string $str The input string.
+     * @return string the resulting string.
+     */
+    function mb_lcfirst($str)
+    {
+        $fc = mb_strtolower(mb_substr($str, 0, 1));
+        return $fc . mb_substr($str, 1);
+    }
+}
+
 /**
- * Make a string's first character uppercase
- * @link http://php.net/manual/en/function.ucfirst.php
+ * Returns transliterated version of a string.
  *
- * @param string $str The input string.
- * @return string the resulting string.
+ * If intl extension isn't available uses fallback
+ * You may customize characters map via $cot_translit_custom variable. See file lang/ru/translit.ru.lang.php
+ *
+ * @param string $string input string
+ * @param string|\Transliterator $transliterator either a \Transliterator or a string
+ *                                               from which a \Transliterator can be built.
+ * @see http://php.net/manual/en/transliterator.transliterate.php
+ *
+ * @return string
+ *
+ * Todo check if russian settings are right
  */
-function mb_ucfirst($str)
+function cot_transliterate($string, $transliterator = null)
 {
-    $fc = mb_strtoupper(mb_substr($str, 0, 1));
-    return $fc.mb_substr($str, 1);
+    global $cot_translit, $cot_translit_custom, $cot_transliterator;
+
+    include cot_langfile('translit', 'core');
+
+    if(is_array($cot_translit_custom)) return strtr($string, $cot_translit_custom);
+
+    if (extension_loaded('intl')) {
+        if($transliterator === null) $transliterator = $cot_transliterator;
+        if ($transliterator === null)  $transliterator = 'Any-Latin; Latin-ASCII; [\u0080-\uffff] remove';
+
+        return transliterator_transliterate($transliterator, $string);
+    }
+
+    if(is_array($cot_translit)) {
+        return strtr($string, $cot_translit);
+    }
+
+    return $string;
+}
+
+function cot_slug($string)
+{
+
 }
 
 /**

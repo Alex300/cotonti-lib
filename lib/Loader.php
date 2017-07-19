@@ -3,19 +3,18 @@
  * Autoloader
  * @author Kalnov Alexey http://portal30.ru
  */
-class Loader{
-
+class Loader
+{
     /**
      * Register the autoloader with spl_autoload_register()
      */
-    public static function register(){
-
+    public static function register()
+    {
         static $registered = false;
-        if(!$registered){
+        if(!$registered) {
             spl_autoload_register(array('Loader', 'autoload'));
             $registered = true;
         }
-
     }
 
     /**
@@ -24,10 +23,9 @@ class Loader{
      * @param  string $class
      * @return bool
      */
-    public static function autoload($class){
-
+    public static function autoload($class)
+    {
         return self::loadClass($class);
-
     }
 
     /**
@@ -47,14 +45,15 @@ class Loader{
      * @param string $class      - The full class name of a Zend component.
      * @param string|array $dirs - OPTIONAL Either a path or an array of paths
      *                             to search.
-     * @return void
+     * @return bool
      * @throws Exception
      */
     public static function loadClass($class, $dirs = null)
     {
         if (class_exists($class, false) || interface_exists($class, false)) {
-            return;
+            return true;
         }
+
         if ((null !== $dirs) && !is_string($dirs) && !is_array($dirs)) {
             throw new Exception('Directory argument must be a string or an array');
         }
@@ -82,6 +81,7 @@ class Loader{
             foreach ($dirs as $key => $dir) {
                 if ($dir == '.') {
                     $dirs[$key] = $dirPath;
+
                 } else {
                     $dir = rtrim($dir, '\\/');
                     $dirs[$key] = $dir . DIRECTORY_SEPARATOR . $dirPath;
@@ -89,11 +89,18 @@ class Loader{
             }
             $file = basename($file);
             return self::loadFile($file, $dirs, true);
-        } else {
-            return self::loadFile($file, null, true);
+
         }
 
-        return false;
+        if(self::loadFile($file, null, true)) return true;
+
+        // In Cotonti folders names often starts with lower case:
+        $tmp = explode(DIRECTORY_SEPARATOR, $file);
+        $fileName = array_pop($tmp);
+        $tmp = array_map('mb_lcfirst', $tmp);
+        $file = implode(DIRECTORY_SEPARATOR, $tmp).$fileName;
+
+        return self::loadFile($file, null, true);
     }
 
     /**
@@ -120,7 +127,6 @@ class Loader{
      * @throws Exception
      */
     public static function loadFile($filename, $dirs = null, $once = false){
-        global $cfg;
         self::securityCheck($filename);
 
         /**
@@ -129,8 +135,8 @@ class Loader{
         $incDirs = array();
         if(empty($dirs)) $incDirs = self::explodeIncludePath();
         if(empty($dirs)) $dirs = array();
-        $dirs[] = $cfg['modules_dir'];
-        $dirs[] = $cfg['plugins_dir'];
+        $dirs[] = cot::$cfg['modules_dir'];
+        $dirs[] = cot::$cfg['plugins_dir'];
         $dirs[] = dirname(__FILE__); //'lib' directory;
         $dirs = array_merge($dirs, $incDirs);
         if(empty($dirs)) return false;
@@ -138,7 +144,7 @@ class Loader{
         /**
          * Try finding for the file
          */
-        foreach($dirs as $dir){
+        foreach($dirs as $dir) {
             if($dir[(mb_strlen($dir) - 1)] != DIRECTORY_SEPARATOR && $dir[(mb_strlen($dir) - 1)] != '/'){
                 $dir .= DIRECTORY_SEPARATOR;
             }
@@ -146,6 +152,7 @@ class Loader{
             if(file_exists($file)){
                 if ($once) {
                     include_once $file;
+
                 } else {
                     include $file;
                 }

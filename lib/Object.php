@@ -132,12 +132,15 @@ class Object
     {
         $getter = 'get' . ucfirst($name);
         if (method_exists($this, $getter)) {
+            // read property
             return $this->$getter();
+
         } elseif (method_exists($this, 'set' . ucfirst($name))) {
             throw new Exception_InvalidCall('Getting write-only property: ' . get_class($this) . '::' . $name);
-        } else {
-            throw new Exception_UnknownProperty('Getting unknown property: ' . get_class($this) . '::' . $name);
+
         }
+
+        throw new Exception_UnknownProperty('Getting unknown property: ' . get_class($this) . '::' . $name);
     }
 
     /**
@@ -155,12 +158,16 @@ class Object
     {
         $setter = 'set' . ucfirst($name);
         if (method_exists($this, $setter)) {
+            // set property
             $this->$setter($value);
+            return;
+
         } elseif (method_exists($this, 'get' . ucfirst($name))) {
             throw new Exception_InvalidCall('Setting read-only property: ' . get_class($this) . '::' . $name);
-        } else {
-            throw new Exception_UnknownProperty('Setting unknown property: ' . get_class($this) . '::' . $name);
+
         }
+
+        throw new Exception_UnknownProperty('Setting unknown property: ' . get_class($this) . '::' . $name);
     }
 
     /**
@@ -177,11 +184,9 @@ class Object
     public function __isset($name)
     {
         $getter = 'get' . ucfirst($name);
-        if (method_exists($this, $getter)) {
-            return $this->$getter() !== null;
-        } else {
-            return false;
-        }
+        if (method_exists($this, $getter)) return $this->$getter() !== null;
+
+        return false;
     }
 
     /**
@@ -201,7 +206,8 @@ class Object
         $setter = 'set' . ucfirst($name);
         if (method_exists($this, $setter)) {
             $this->$setter(null);
-        } elseif (method_exists($this, 'get' . $name)) {
+
+        } elseif (method_exists($this, 'get' . ucfirst($name))) {
             throw new Exception_InvalidCall('Unsetting read-only property: ' . get_class($this) . '::' . $name);
         }
     }

@@ -126,20 +126,21 @@ class Component extends Object
         if (method_exists($this, $getter)) {
             // read property, e.g. getName()
             return $this->$getter();
-        } else {
-            // behavior property
-            $this->ensureBehaviors();
-            foreach ($this->_behaviors as $behavior) {
-                if ($behavior->canGetProperty($name)) {
-                    return $behavior->$name;
-                }
+        }
+
+        // Behavior property
+        $this->ensureBehaviors();
+        foreach ($this->_behaviors as $behavior) {
+            if ($behavior->canGetProperty($name)) {
+                return $behavior->$name;
             }
         }
+
         if (method_exists($this, 'set' . ucfirst($name))) {
             throw new Exception_InvalidCall('Getting write-only property: ' . get_class($this) . '::' . $name);
-        } else {
-            throw new Exception_UnknownProperty('Getting unknown property: ' . get_class($this) . '::' . $name);
         }
+
+        throw new Exception_UnknownProperty('Getting unknown property: ' . get_class($this) . '::' . $name);
     }
 
     /**
@@ -165,35 +166,35 @@ class Component extends Object
         if (method_exists($this, $setter)) {
             // set property
             $this->$setter($value);
-
             return;
+
         } elseif (strncmp($name, 'on ', 3) === 0) {
             // on event: attach event handler
             $this->on(trim(substr($name, 3)), $value);
-
             return;
+
         } elseif (strncmp($name, 'as ', 3) === 0) {
             // as behavior: attach behavior
             $name = trim(substr($name, 3));
-            $this->attachBehavior($name, $value instanceof Behavior ? $value : Yii::createObject($value));
-
+            $this->attachBehavior($name, $value instanceof Behavior ? $value :  new $value());
             return;
-        } else {
-            // behavior property
-            $this->ensureBehaviors();
-            foreach ($this->_behaviors as $behavior) {
-                if ($behavior->canSetProperty($name)) {
-                    $behavior->$name = $value;
 
-                    return;
-                }
+        }
+
+        // Behavior property
+        $this->ensureBehaviors();
+        foreach ($this->_behaviors as $behavior) {
+            if ($behavior->canSetProperty($name)) {
+                $behavior->$name = $value;
+                return;
             }
         }
+
         if (method_exists($this, 'get' . ucfirst($name))) {
             throw new Exception_InvalidCall('Setting read-only property: ' . get_class($this) . '::' . $name);
-        } else {
-            throw new Exception_UnknownProperty('Setting unknown property: ' . get_class($this) . '::' . $name);
         }
+
+        throw new Exception_UnknownProperty('Setting unknown property: ' . get_class($this) . '::' . $name);
     }
 
     /**
@@ -213,17 +214,16 @@ class Component extends Object
     public function __isset($name)
     {
         $getter = 'get' . ucfirst($name);
-        if (method_exists($this, $getter)) {
-            return $this->$getter() !== null;
-        } else {
-            // behavior property
-            $this->ensureBehaviors();
-            foreach ($this->_behaviors as $behavior) {
-                if ($behavior->canGetProperty($name)) {
-                    return $behavior->$name !== null;
-                }
+        if (method_exists($this, $getter)) return $this->$getter() !== null;
+
+        // Behavior property
+        $this->ensureBehaviors();
+        foreach ($this->_behaviors as $behavior) {
+            if ($behavior->canGetProperty($name)) {
+                return $behavior->$name !== null;
             }
         }
+
         return false;
     }
 
@@ -246,16 +246,17 @@ class Component extends Object
         if (method_exists($this, $setter)) {
             $this->$setter(null);
             return;
-        } else {
-            // behavior property
-            $this->ensureBehaviors();
-            foreach ($this->_behaviors as $behavior) {
-                if ($behavior->canSetProperty($name)) {
-                    $behavior->$name = null;
-                    return;
-                }
+        }
+
+        // Behavior property
+        $this->ensureBehaviors();
+        foreach ($this->_behaviors as $behavior) {
+            if ($behavior->canSetProperty($name)) {
+                $behavior->$name = null;
+                return;
             }
         }
+
         throw new Exception_InvalidCall('Unsetting an unknown or read-only property: ' . get_class($this) . '::' . $name);
     }
 
@@ -658,11 +659,12 @@ class Component extends Object
     private function attachBehaviorInternal($name, $behavior)
     {
         if (!($behavior instanceof Behavior)) {
-            $behavior = Yii::createObject($behavior);
+            $behavior = new $behavior();
         }
         if (is_int($name)) {
             $behavior->attach($this);
             $this->_behaviors[] = $behavior;
+
         } else {
             if (isset($this->_behaviors[$name])) {
                 $this->_behaviors[$name]->detach();
