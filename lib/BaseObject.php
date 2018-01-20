@@ -72,7 +72,7 @@
  * @since 2.0
  */
 //class Object implements Configurable
-class Object
+class BaseObject
 {
     /**
      * Returns the fully qualified name of this class.
