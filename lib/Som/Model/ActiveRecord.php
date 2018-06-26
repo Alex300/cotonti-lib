@@ -1265,8 +1265,6 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
     // ==== /Методы для работы с полями ====
 
     // ==== Методы для Валидации ====
-    protected function validators(){ return array(); }
-
     public function getValidators($field = null)
     {
         if (!empty($field)) {
@@ -1298,18 +1296,6 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
 
         return $this;
     }
-
-    public function hasErrors($field = null) {
-        if (!is_null($field)) {
-            return (isset($this->_errors[$field]) && count($this->_errors[$field]));
-
-        } elseif (count($this->_errors)) {
-            return true;
-        }
-
-        return false;
-    }
-
 
     /**
      * Performs the model data validation.

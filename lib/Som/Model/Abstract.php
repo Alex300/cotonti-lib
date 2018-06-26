@@ -72,6 +72,13 @@ abstract class Som_Model_Abstract extends Component
         // Инициализация полей
         $fields = static::fields();
         foreach ($fields as $name => $field) {
+            if(isset($field['link'])) {
+                // Не включаем связи указывающие на другое поле
+                if(in_array($field['link']['relation'], [\Som::TO_ONE, \Som::TO_ONE_NULL]) &&
+                    isset($field['link']['localKey'])) {
+                    continue;
+                }
+            }
             // Дефолтное значение
             $this->_data[$name] = isset($field['default']) ? $field['default'] : null;
         }
@@ -466,9 +473,63 @@ abstract class Som_Model_Abstract extends Component
     // ==== /Методы для работы с полями ====
 
     // ==== Методы для Валидации ====
-    protected function validators()
+    protected function validators(){ return []; }
+
+    public function addError($field, $message = null)
     {
-        return array();
+        if ($message && isset($this->_errors[$field]) ) {
+            if (!in_array($message, $this->_errors[$field])) {
+                $this->_errors[$field][] = $message;
+            }
+
+        } else {
+            $this->_errors[$field][] = $message;
+        }
+    }
+
+    public function hasErrors($field = null)
+    {
+        if (!is_null($field)) {
+            return (isset($this->_errors[$field]) && count($this->_errors[$field]));
+
+        } elseif (count($this->_errors)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Returns the errors for all fields or a single field.
+     *
+     * @param string $field field name. Use null to retrieve errors for all fields.
+     *
+     * @return array|null
+     *
+     * Note that when returning errors for all fields, the result is a two-dimensional array, like the following:
+     *
+     * ```php
+     * [
+     *     'username' => [
+     *         'Username is required.',
+     *         'Username must contain only word characters.',
+     *     ],
+     *     'email' => [
+     *         'Email address is invalid.',
+     *     ]
+     * ]
+     * ```
+     */
+    public function getErrors($field = null)
+    {
+        if (!is_null($field)) {
+            if(isset($this->_errors[$field]) && count($this->_errors[$field])) return $this->_errors[$field];
+
+        } elseif (count($this->_errors)) {
+            return $this->_errors;
+        }
+
+        return null;
     }
 
     /**
@@ -607,14 +668,14 @@ abstract class Som_Model_Abstract extends Component
                         $validator->setField($name);
                         if (!$validator->isValid($value)) {
                             $error = implode(', ', $validator->getMessages());
-                            $this->addErrorMessage($name, $error);
+                            $this->addError($name, $error);
                         }
 
                     } elseif (is_callable($validator) && $value) {
                         // Проверка на callback
                         try {
                             $res = call_user_func_array($validator, array($value));
-                            if ($res !== true) $this->addErrorMessage($name, $res);
+                            if ($res !== true) $this->addError($name, $res);
 
                         } catch (Exception $e) {
                             throw new Exception("Не правильный CallBack validator для поля '{$name}'");
@@ -623,12 +684,14 @@ abstract class Som_Model_Abstract extends Component
                     } elseif (is_string($validator)) {
                         switch (mb_strtolower($validator)) {
                             case 'required':
-                                $this->_requiredFields[$name] = 1;
                                 if (($value === '') || (is_null($value))) {
-                                    // Спасибо Дмитрию за найденную ошибку.
-                                    $error = 'Обязательное для заполнения' . ': ' . $fieldName;
-                                    $this->addErrorMessage($name, $error);
+                                    $fieldName = $name;
+                                    $tmp = static::fieldLabel($name);
+                                    if(!empty($tmp)) $fieldName = $tmp;
+                                    $error = 'Field is required'.': '.$fieldName;
+                                    $this->addError($name, $error);
                                 }
+
                                 break;
                         }
                     }
@@ -684,18 +747,6 @@ abstract class Som_Model_Abstract extends Component
         $event = new ModelEvent;
         $event->data['validateFields'] = $validateFields;
         $this->trigger(self::EVENT_AFTER_VALIDATE, $event);
-    }
-
-    public function addErrorMessage($field, $message = null)
-    {
-        if ($message && isset($this->_errors[$field]) ) {
-            if (!in_array($message, $this->_errors[$field])) {
-                $this->_errors[$field][] = $message;
-            }
-
-        } else {
-            $this->_errors[$field][] = $message;
-        }
     }
     // ==== /Методы для Валидации ====
 
