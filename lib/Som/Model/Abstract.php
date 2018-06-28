@@ -295,6 +295,17 @@ abstract class Som_Model_Abstract extends Component
     }
 
     /**
+     * Converts the model into an array.
+     *
+     * @return array
+     */
+    function toArray()
+    {
+        $data = $this->_data;
+        return $data;
+    }
+
+    /**
      * Populates the model with input data.
      *
      * with `setData()` can be written as:

@@ -483,15 +483,6 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         $this->_oldData = array();
     }
 
-    /**
-     * Возвращает элемент в виде массива
-     * @return array
-     */
-    function toArray()
-    {
-        $data = $this->_data;
-        return $data;
-    }
 
     /**
      * Populates the model with input data.
@@ -741,10 +732,11 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
     }
 
     /**
-     * Save data
+     * Saves model data into the associated database table.
      *
      * @param Som_Model_Mapper_Abstract|array|null $data
      * @return int id of saved record
+     * @throws Exception
      */
     public function save($data = null)
     {
