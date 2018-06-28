@@ -863,6 +863,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
 
     /**
      * Update object
+     * @todo Отправлять на сохранение только измененные поля
      */
     protected final function update()
     {
