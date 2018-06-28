@@ -580,6 +580,17 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
             return static::$_db->dec(static::$_tbname, $pair, " {$pkey} = {$this->getId()} " .$conditions);
         }
     }
+
+    /**
+     * Returns field names that have been modified since they are loaded or saved most recently.
+     *
+     * @return array
+     */
+    public function changedFields()
+    {
+        if(!empty($this->_oldData)) return array_keys($this->_oldData);
+        return [];
+    }
     // ==== /Методы для манипуляции с данными ====
 
 
