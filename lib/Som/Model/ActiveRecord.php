@@ -1061,28 +1061,16 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
 
 
     // ==== Методы для работы с полями ====
-    /**
-     * Возвращает описание поля
-     * @param $column
-     * @return string
-     */
-    public static function fieldLabel($column) {
-        $className = get_called_class();
-        if(isset(cot::$L[$className.'_'.$column.'_title'])) return cot::$L[$className.'_'.$column.'_title'];
-
-        $fields = static::fields();
-        if (isset($fields[$column]['description'])) return $fields[$column]['description'];
-
-        return '';
-    }
 
     /**
-     * Возвращает все поля, включая дополнительные
+     * Returns the list of field names.
+     * By default, this method returns all public non-static properties of the class.
+     * You may override this method to change the default behavior.
      *
-     * @param bool $real  получить поля напрямую из таблицы
-     * @param bool $cache Использовать кеш периода выполнения
+     * @param bool $real   Get fields directly from DB
+     * @param bool $cache  Use static cache
      *
-     * @return array
+     * @return array list of field names.
      */
     public static function fields($real = false, $cache = true) {
         if ($real) return static::$_db->getFields(static::$_tbname);

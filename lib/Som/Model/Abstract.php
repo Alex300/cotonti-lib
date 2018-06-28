@@ -364,26 +364,15 @@ abstract class Som_Model_Abstract extends Component
     // ==== /Методы для манипуляции с данными ====
 
     // ==== Методы для работы с полями ====
-    /**
-     * Возвращает описание поля
-     * @param $column
-     * @return string
-     */
-    public static function fieldLabel($column)
-    {
-        $fields = static::fields();
-        if (isset($fields[$column]['description'])) return $fields[$column]['description'];
-
-        return '';
-    }
 
     /**
-     * Возвращает все поля, включая дополнительные
+     * Returns the list of field names.
+     * By default, this method returns all public non-static properties of the class.
+     * You may override this method to change the default behavior.
      *
-     * @param bool $real получить поля напрямую из таблицы
-     * @param bool $cache Использовать кеш периода выполнения
+     *  @param bool $cache Use static cache
      *
-     * @return array
+     * @return array list of field names.
      */
     public static function fields($cache = true)
     {
@@ -396,6 +385,80 @@ abstract class Som_Model_Abstract extends Component
         return self::$fields[$className];
     }
 
+    /**
+     * Returns the field labels.
+     *
+     * Fields labels are mainly used for display purpose. For example, given an attribute
+     * `firstName`, we can declare a label `First Name` which is more user-friendly and can
+     * be displayed to end users.
+     *
+     * Note, in order to inherit labels defined in the parent class, a child class needs to
+     * merge the parent labels with child labels using functions such as `array_merge()`.
+     *
+     * @return array field labels (field_name => label)
+     */
+    public static function fieldLabels() { return []; }
+
+    /**
+     * Returns the field hints (descriptions).
+     *
+     * Field hints are mainly used for display purpose. For example, given an field
+     * `isPublic`, we can declare a hint `Whether the post should be visible for not logged in users`,
+     * which provides user-friendly description of the field meaning and can be displayed to end users.
+     *
+     * Note, in order to inherit hints defined in the parent class, a child class needs to
+     * merge the parent hints with child hints using functions such as `array_merge()`.
+     *
+     * @return array field hints (field_name => hint)
+     */
+    public static function fieldHints() { return []; }
+
+    /**
+     * Returns the text label for the specified field.
+     *
+     * @param string $column the field name
+     * @return string the field label
+     */
+    public static function fieldLabel($column)
+    {
+        // Localised label
+        $className = get_called_class();
+        if(isset(cot::$L[$className.'_'.$column.'_label'])) return cot::$L[$className.'_'.$column.'_label'];
+        // Backward compatibility
+        if(isset(cot::$L[$className.'_'.$column.'_title'])) return cot::$L[$className.'_'.$column.'_title'];
+
+        $labels = static::fieldLabels();
+        if (isset($labels[$column])) return $labels[$column];
+
+        $fields = static::fields();
+        if (isset($fields[$column]['label'])) return $fields[$column]['label'];
+
+        // Backward compatibility
+        if (isset($fields[$column]['description'])) return $fields[$column]['description'];
+
+        return '';
+    }
+
+    /**
+     * Returns the text hint for the specified attribute.
+     *
+     * @param string $column the attribute name
+     * @return string the attribute hint
+     */
+    public static function fieldHint($column)
+    {
+        // Localised label
+        $className = get_called_class();
+        if(isset(cot::$L[$className.'_'.$column.'_hint'])) return cot::$L[$className.'_'.$column.'_hint'];
+
+        $hints = static::fieldHints();
+        if (isset($hints[$column])) return $hints[$column];
+
+        $fields = static::fields();
+        if (isset($fields[$column]['hint'])) return $fields[$column]['hint'];
+
+        return '';
+    }
 
     /**
      * Получить все поля из БД
@@ -520,7 +583,7 @@ abstract class Som_Model_Abstract extends Component
      * ]
      * ```
      */
-    public function getErrors($field = null)
+    public function errors($field = null)
     {
         if (!is_null($field)) {
             if(isset($this->_errors[$field]) && count($this->_errors[$field])) return $this->_errors[$field];
