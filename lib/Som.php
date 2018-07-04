@@ -9,6 +9,26 @@
  * @author Kalnov Alexey <kalnov_alexey@yandex.ru> http://portal30.ru
  * @version 2.0
  *
+ * @todo типы связей:
+ *  HAS_ONE  - A one-to-one relationship
+ *      вернёт связный объект Active Record. Производит выборку объекта по указанному полю в связанном объекте (foreign key).
+ *      Если поле не указано, может быть получени автоматически
+ *
+ *  HAS_MANY - A "one-to-many" relationship
+ *       вернёт массив связных объектов Active Record. Производит выборку объектов по указанному полю в связанном объекте (foreign key)
+ *       Если поле не указано, может быть получени автоматически
+ *
+ *  BELONGS_TO - inverse for HAS_ONE и HAS_MANY
+ *       вернет связанный объект Active Record. Производит выборку объекта по указанному своему полю (local_key).
+ *       Сейчас это TO_ONE
+ *
+ *       Example:
+ *          User - модель пользователя. Order - модель заказа. Order имеет поле user_id.
+ *          User HAS_MANY Order (Пользователь имеет много заказов),   а Order BELONGS_TO User (Заказ принадлежит пользователю)
+ *
+ *  BELONGS_TO_MANY (или MANY_TO_MANY)- Many-to-many relations
+ *       Использует промежуточную таблицу для связи. Можно указывать промежуточную таблицу или она будет вычисляться автоматически
+ *       Сейчас это TO_MANY
  *
  *  @todo Models   use cot_build_extrafields_data and cot_parse
  *                 В общем вывод в форму и на страницу нужно как то разделить
