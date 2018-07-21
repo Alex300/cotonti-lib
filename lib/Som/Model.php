@@ -1,4 +1,7 @@
 <?php
+
+namespace Som;
+
 /**
  * Model is the base class for data models.
  *
@@ -19,7 +22,7 @@
  *
  * @author  Kalnov Alexey <kalnov_alexey@yandex.ru> http://portal30.ru
  */
-abstract class Som_Model_Abstract extends Component
+abstract class Model extends \Component
 {
 
     /**
@@ -119,8 +122,8 @@ abstract class Som_Model_Abstract extends Component
      * will be implicitly called when executing `$value = $component->property;`.
      * @param string $name the property name
      * @return mixed the property value or the value of a behavior's property
-     * @throws Exception_UnknownProperty if the property is not defined
-     * @throws Exception_InvalidCall if the property is write-only.
+     * @throws \Exception_UnknownProperty if the property is not defined
+     * @throws \Exception_InvalidCall if the property is write-only.
      * @see __set()
      */
     public function __get($name)
@@ -177,7 +180,7 @@ abstract class Som_Model_Abstract extends Component
         } elseif (strncmp($name, 'as ', 3) === 0) {
             // as behavior: attach behavior
             $name = trim(substr($name, 3));
-            $this->attachBehavior($name, $value instanceof Behavior ? $value : new $value() );
+            $this->attachBehavior($name, $value instanceof \Behavior ? $value : new $value() );
             return;
 
         }
@@ -222,7 +225,7 @@ abstract class Som_Model_Abstract extends Component
             $tmp = $this->__get($name);
             return $tmp !== null;
 
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return false;
         }
     }
@@ -237,7 +240,7 @@ abstract class Som_Model_Abstract extends Component
      * Do not call this method directly as it is a PHP magic method that
      * will be implicitly called when executing `unset($component->property)`.
      * @param string $name the property name
-     * @throws Exception_InvalidCall if the property is read only.
+     * @throws \Exception_InvalidCall if the property is read only.
      * @see http://php.net/manual/en/function.unset.php
      */
     public function __unset($name)
@@ -272,7 +275,7 @@ abstract class Som_Model_Abstract extends Component
             return;
         }
 
-        throw new Exception_InvalidCall('Unsetting an unknown or read-only property: ' . get_class($this) . '::' . $name);
+        throw new \Exception_InvalidCall('Unsetting an unknown or read-only property: ' . get_class($this) . '::' . $name);
     }
 
     protected function beforeSetData(&$data)
@@ -286,7 +289,7 @@ abstract class Som_Model_Abstract extends Component
         }
         /* ===== */
 
-        $event = new ModelEvent;
+        $event = new Event;
         $event->data['data'] = $data;
 
         $this->trigger(self::EVENT_BEFORE_SET_DATA, $event);
@@ -316,10 +319,10 @@ abstract class Som_Model_Abstract extends Component
      * }
      * ```
      *
-     * @param array|Som_Model_ActiveRecord $data
+     * @param array|Model $data
      * @param bool $safe безопасный режим
      *
-     * @throws Exception
+     * @throws \Exception
      * @return bool
      */
     public function setData($data, $safe = true)
@@ -334,7 +337,7 @@ abstract class Som_Model_Abstract extends Component
         if ($data instanceof $class)
             $data = $data->toArray();
         if (!is_array($data)) {
-            throw new  Exception("Data must be an Array or instance of $class Class");
+            throw new  \Exception("Data must be an Array or instance of $class Class");
         }
 
         $path = trim($_SERVER['REQUEST_URI'], '/');
@@ -346,8 +349,8 @@ abstract class Som_Model_Abstract extends Component
         $mPath = $path ? explode("/", $path) : array();
         foreach ($data as $key => $value) {
             if ($safe && isset($fields[$key]['safe']) && $fields[$key]['safe']) {
-                if(!cot::$usr['isadmin'] && cot::$env['ext'] != 'admin'){
-                    throw new Exception("Trying to write value «{$value}» to protected field «{$key}» of model «{$class}»");
+                if(!\cot::$usr['isadmin'] && \cot::$env['ext'] != 'admin'){
+                    throw new \Exception("Trying to write value «{$value}» to protected field «{$key}» of model «{$class}»");
                 }
             }
 
@@ -434,9 +437,9 @@ abstract class Som_Model_Abstract extends Component
     {
         // Localised label
         $className = get_called_class();
-        if(isset(cot::$L[$className.'_'.$column.'_label'])) return cot::$L[$className.'_'.$column.'_label'];
+        if(isset(\cot::$L[$className.'_'.$column.'_label'])) return \cot::$L[$className.'_'.$column.'_label'];
         // Backward compatibility
-        if(isset(cot::$L[$className.'_'.$column.'_title'])) return cot::$L[$className.'_'.$column.'_title'];
+        if(isset(\cot::$L[$className.'_'.$column.'_title'])) return \cot::$L[$className.'_'.$column.'_title'];
 
         $labels = static::fieldLabels();
         if (isset($labels[$column])) return $labels[$column];
@@ -460,7 +463,7 @@ abstract class Som_Model_Abstract extends Component
     {
         // Localised label
         $className = get_called_class();
-        if(isset(cot::$L[$className.'_'.$column.'_hint'])) return cot::$L[$className.'_'.$column.'_hint'];
+        if(isset(\cot::$L[$className.'_'.$column.'_hint'])) return \cot::$L[$className.'_'.$column.'_hint'];
 
         $hints = static::fieldHints();
         if (isset($hints[$column])) return $hints[$column];
@@ -640,7 +643,7 @@ abstract class Som_Model_Abstract extends Component
         }
         /* ===== */
 
-        $event = new ModelEvent;
+        $event = new Event;
         $event->data['validateFields'] = $validateFields;
         $this->trigger(self::EVENT_BEFORE_VALIDATE, $event);
 
@@ -660,7 +663,7 @@ abstract class Som_Model_Abstract extends Component
      * @param bool  $clearErrors    whether to call [[clearErrors()]] before performing validation
      *
      * @return bool
-     * @throws Exception
+     * @throws \Exception
      *
      * @todo дописать метод
      */
@@ -737,7 +740,7 @@ abstract class Som_Model_Abstract extends Component
             if (isset($this->validators[$name]) && count($this->validators[$name]) > 0) {
                 foreach ($this->validators[$name] as $validator) {
                     // Проверка на Validator_Abstract
-                    if ($validator instanceof Validator_Abstract) {
+                    if ($validator instanceof \Validator_Abstract) {
                         $validator->setModel($this);
                         $validator->setField($name);
                         if (!$validator->isValid($value)) {
@@ -751,8 +754,8 @@ abstract class Som_Model_Abstract extends Component
                             $res = call_user_func_array($validator, array($value));
                             if ($res !== true) $this->addError($name, $res);
 
-                        } catch (Exception $e) {
-                            throw new Exception("Не правильный CallBack validator для поля '{$name}'");
+                        } catch (\Exception $e) {
+                            throw new \Exception("Не правильный CallBack validator для поля '{$name}'");
                         }
 
                     } elseif (is_string($validator)) {
@@ -818,7 +821,7 @@ abstract class Som_Model_Abstract extends Component
         }
         /* ===== */
 
-        $event = new ModelEvent;
+        $event = new Event;
         $event->data['validateFields'] = $validateFields;
         $this->trigger(self::EVENT_AFTER_VALIDATE, $event);
     }

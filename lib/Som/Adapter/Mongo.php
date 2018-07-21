@@ -1,10 +1,15 @@
 <?php
+
+namespace Som\Adapter;
+
+use \Som\Adapter;
+
 /**
  * Mongo Mapper
  *
  * @author Mankov
  */
-class Som_Model_Mapper_Mongo extends Som_Model_Mapper_Abstract 
+class Mongo extends Adapter
 {
 
     protected $_adapter = null;

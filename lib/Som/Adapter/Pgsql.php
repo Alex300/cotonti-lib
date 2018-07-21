@@ -1,12 +1,15 @@
 <?php
 
+namespace Som\Adapter;
+
+use \Som\Adapter;
+
 /**
- *
- * PostgresSql Mapper
+ * PostgreSQL Adapter
  * @author Kalnov Alexey http://portal30.ru
  */
-class Som_Model_Mapper_Pgsql extends Som_Model_Mapper_Abstract {
-
+class Pgsql extends Adapter
+{
     protected $tableQuote = '"';
 
 //    public function getAdapter(){
@@ -74,7 +77,7 @@ class Som_Model_Mapper_Pgsql extends Som_Model_Mapper_Abstract {
         $stmt = $this->query($sql);
 
         // Use FETCH_NUM so we are not dependent on the CASE attribute of the PDO connection
-        $result = $stmt->fetchAll(PDO::FETCH_NUM);
+        $result = $stmt->fetchAll(\PDO::FETCH_NUM);
 
         $attnum        = 0;
         $nspname       = 1;
@@ -131,20 +134,20 @@ class Som_Model_Mapper_Pgsql extends Som_Model_Mapper_Abstract {
     }
 
 
-    /*
+    /**
      * Получить наименование первичного ключа можно след. запросом
      *
-     SELECT
-    i.relname AS indexname,
-    pg_get_indexdef(i.oid) AS indexdef
-FROM pg_index x
-INNER JOIN pg_class i ON i.oid = x.indexrelid
-WHERE x.indrelid = '$table'::regclass::oid AND i.relkind = 'i'::"char"
-AND x.indisprimary
-
+     *   SELECT
+     *       i.relname AS indexname,
+     *       pg_get_indexdef(i.oid) AS indexdef
+     *   FROM pg_index x
+     *   INNER JOIN pg_class i ON i.oid = x.indexrelid
+     *   WHERE x.indrelid = '$table'::regclass::oid AND i.relkind = 'i'::"char"
+     *   AND x.indisprimary
+     *
      */
-
-    public function lastInsertId($table_name = '', $pkey = ''){
+    public function lastInsertId($table_name = '', $pkey = '')
+    {
         if(empty($table_name)){
             $table_name = $this->_dbinfo['tbname'];
             $pkey   = $this->_dbinfo['pkey'];
@@ -173,12 +176,13 @@ AND x.indisprimary
      * @param string $schema
      * @return array
      */
-    public function tables($schema = ''){
+    public function tables($schema = '')
+    {
         if(empty($schema)) $schema = 'public';
 
         $sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = ?  ORDER BY table_name";
         $ret = $this->query($sql, $schema);
-        $res = $ret->fetchAll(PDO::FETCH_COLUMN);
+        $res = $ret->fetchAll(\PDO::FETCH_COLUMN);
 
         return $res;
     }
@@ -188,19 +192,20 @@ AND x.indisprimary
      * @param $table
      * @return bool
      */
-    public function tableExists($table = false){
+    public function tableExists($table = false)
+    {
         if(!$table) $table = $this->_dbinfo['tbname'];
 
         $res = $this->query("SELECT 1 FROM pg_catalog.pg_class WHERE relkind = 'r' AND relname = ? AND pg_catalog.pg_table_is_visible(oid) LIMIT 1", $table)->fetchAll();
         if ($res === false) {
             $array = $this->_adapter->errorInfo();
-            throw new Exception('SQL Error: ' . $array[2]);
+            throw new \Exception('SQL Error: ' . $array[2]);
         }
         return !empty($res);
     }
 
-    public function createTable($table = '', $fields = array()){
-
+    public function createTable($table = '', $fields = array())
+    {
         $tq =    $this->tableQuote;
 
         if(empty($table)) $table = $this->_dbinfo['tbname'];
@@ -227,7 +232,7 @@ AND x.indisprimary
         $res = $this->_adapter->query($sql);
         if ($res === false) {
             $array = $this->_adapter->errorInfo();
-            throw new Exception('SQL Error: ' . $array[2]);
+            throw new \Exception('SQL Error: ' . $array[2]);
         }
         if(is_array($fields)){
             if(array_key_exists($pKey, $fields)) unset($fields[$pKey]);
@@ -236,22 +241,23 @@ AND x.indisprimary
                 $this->createField($fld, $table);
             }
         }
-
     }
 
 
-    public function fieldExists($field_name, $table = '')    {
+    public function fieldExists($field_name, $table = '')
+    {
         $tq =    $this->tableQuote;
         if(empty($table)) $table = $this->_dbinfo['tbname'];
 
         $sql = "SELECT count(*) FROM information_schema.columns WHERE table_name = :table AND column_name = :fieldname";
         $params = array('table' => $table, 'fieldname' => $field_name);
-        $fields = $this->query($sql, $params)->fetch(PDO::FETCH_COLUMN);
+        $fields = $this->query($sql, $params)->fetch(\PDO::FETCH_COLUMN);
 
         return ($fields > 0) ? true : false;
     }
 
-    public function alterField($old, $new = false){
+    public function alterField($old, $new = false)
+    {
         die('move "alterField" to postgres');
 
         if(empty($old)) return false;
@@ -283,7 +289,7 @@ AND x.indisprimary
             $res = $adapter->query($sql);
             if ($res === false) {
                 $array = $this->_adapter->errorInfo();
-                throw new Exception('SQL Error: ' . $array[2]);
+                throw new \Exception('SQL Error: ' . $array[2]);
             }
             return $res;
         }
@@ -324,10 +330,10 @@ AND x.indisprimary
         $res = $adapter->query($sql);
 
         return $res;
-
     }
 
-    public function deleteField($field){
+    public function deleteField($field)
+    {
         die('move "deleteField" to postgres');
 
         if(!$this->fieldExists($field)) return false;
@@ -341,20 +347,21 @@ AND x.indisprimary
      * @param string $table
      * @return array
      */
-    public function getFields($table = '') {
-
+    public function getFields($table = '')
+    {
         if(!$table) $table = $this->_dbinfo['tbname'];
 
         $keyName = 'SomModelPgsqlFields' . $table;
 //        if (($fields=LaCache::load($keyName))===false) {
             $sql = "SELECT column_name FROM information_schema.columns WHERE table_name = ?";
-            $fields = $this->query($sql, $table)->fetchAll(PDO::FETCH_COLUMN);
+            $fields = $this->query($sql, $table)->fetchAll(\PDO::FETCH_COLUMN);
 //            LaCache::save($fields, $keyName);
 //        }
         return $fields;
     }
 
-    public function renameTable($tablename = '', $newtablename=''){
+    public function renameTable($tablename = '', $newtablename='')
+    {
         if(empty($tablename)) $tablename = $this->_dbinfo['tbname'];
         if(empty($newtablename)) $newtablename = 'renamed_'. $this->_dbinfo['tbname'] ;
         $sql = 'ALTER TABLE "'. $tablename . '" RENAME TO "'.$newtablename.'"';
@@ -362,7 +369,7 @@ AND x.indisprimary
         $res = $this->_adapter->query($sql);
         if ($res === false) {
             $array = $this->_adapter->errorInfo();
-            throw new Exception('SQL Error: ' . $array[2]);
+            throw new \Exception('SQL Error: ' . $array[2]);
         }
         return $res;
     }
@@ -374,8 +381,7 @@ AND x.indisprimary
      * @return array|string
      */
     public function quote($data){
-        if (is_bool($data))
-            $data = $data ? 'true' : 'false';
+        if (is_bool($data)) $data = $data ? 'true' : 'false';
         return parent::quote($data);
     }
 }

@@ -1,11 +1,16 @@
 <?php
+
+namespace Som;
+
+use Helpers\Inflector;
+
 /**
- *
+ * Abstract DB Adapter class
  */
-abstract class Som_Model_Mapper_Abstract
+abstract class Adapter
 {
     /**
-     * @var PDO[] connections registry
+     * @var \PDO[] connections registry
      */
     protected static $connections = array();
 
@@ -16,6 +21,7 @@ abstract class Som_Model_Mapper_Abstract
 
     /**
      * @var array
+     * @deprecated
      */
     protected $_dbinfo = null;
 
@@ -26,7 +32,7 @@ abstract class Som_Model_Mapper_Abstract
     protected $_affected_rows = 0;
 
     /**
-     * @var PDO ссылка на объект БД
+     * @var \PDO ссылка на объект БД
      */
     protected $_adapter = null;
 
@@ -55,7 +61,8 @@ abstract class Som_Model_Mapper_Abstract
      * @param string $dbc
      * @param array  $dbInfo
      */
-    function __construct($dbc = 'db', $dbInfo = array() ){
+    function __construct($dbc = 'db', $dbInfo = [])
+    {
         $this->_adapter = static::connect($dbc);
         $this->_dbinfo = $dbInfo;
     }
@@ -63,7 +70,7 @@ abstract class Som_Model_Mapper_Abstract
     /**
      * Connect to Data Base
      * @param $dbc
-     * @return PDO
+     * @return \PDO
      */
     protected static function connect($dbc) {
         if (empty(self::$connections[$dbc])) {
@@ -71,13 +78,13 @@ abstract class Som_Model_Mapper_Abstract
             // Connect to DB
             if($dbc == 'db'){
                 // Default cotonti connection
-                self::$connections[$dbc] = cot::$db;
+                self::$connections[$dbc] = \cot::$db;
             }else{
                 // Альтернативное соединение из конфига
-                $dbc_port = empty(cot::$cfg[$dbc]['port']) ? '' : ';port=' . cot::$cfg[$dbc]['port'];
-                $dsn = cot::$cfg[$dbc]['adapter'] . ':host=' . cot::$cfg[$dbc]['host'] . $dbc_port .
-                    ';dbname=' . cot::$cfg[$dbc]['dbname'];
-                self::$connections[$dbc] = new PDO($dsn, cot::$cfg[$dbc]['username'], cot::$cfg[$dbc]['password']);
+                $dbc_port = empty(\cot::$cfg[$dbc]['port']) ? '' : ';port=' . \cot::$cfg[$dbc]['port'];
+                $dsn = \cot::$cfg[$dbc]['adapter'] . ':host=' . \cot::$cfg[$dbc]['host'] . $dbc_port .
+                    ';dbname=' . \cot::$cfg[$dbc]['dbname'];
+                self::$connections[$dbc] = new \PDO($dsn, \cot::$cfg[$dbc]['username'], \cot::$cfg[$dbc]['password']);
             }
         }
 
@@ -194,8 +201,8 @@ abstract class Som_Model_Mapper_Abstract
      * @see http://www.php.net/manual/en/pdo.prepare.php
      * @param string $query The SQL statement to prepare and execute.
      * @param array $parameters An array of values to be binded as input parameters to the query. PHP int parameters will beconsidered as PDO::PARAM_INT, others as PDO::PARAM_STR.
-     * @return PDOStatement
-     * @throws Exception
+     * @return \PDOStatement
+     * @throws \Exception
      */
     public function query($query, $parameters = array())
     {
@@ -210,14 +217,14 @@ abstract class Som_Model_Mapper_Abstract
 
             if ($result->execute() === false) {
                 $array = $this->_adapter->errorInfo();
-                throw new Exception('SQL Error: ' . $array[2]);
+                throw new \Exception('SQL Error: ' . $array[2]);
             }
 
         } else {
             $result = $this->_adapter->query($query);
             if ($result === false) {
                 $array = $this->_adapter->errorInfo();
-                throw new Exception('SQL Error: ' . $array[2]);
+                throw new \Exception('SQL Error: ' . $array[2]);
             }
         }
 //        }
@@ -229,7 +236,7 @@ abstract class Som_Model_Mapper_Abstract
 //            }
 //        }
         // We use PDO::FETCH_ASSOC by default to save memory
-        $result->setFetchMode(PDO::FETCH_ASSOC);
+        $result->setFetchMode(\PDO::FETCH_ASSOC);
         $this->_affected_rows = $result->rowCount();
         return $result;
     }
@@ -243,28 +250,28 @@ abstract class Som_Model_Mapper_Abstract
      * @param  int $offset
      * @param  array|string $order
      * @param  array $columns
-     * @return bool|Som_Model_ActiveRecord[]
-     * @throws Exception
+     * @return bool|ActiveRecord[]
+     * @throws \Exception
      */
     public function fetch($conditions = array(), $limit = 0, $offset = 0, $order = '', $columns = Array())
     {
         $tq = $this->tableQuote;
-        $table = $this->_dbinfo['tbname'];
-        /** @var Som_Model_ActiveRecord $model_name */
-        $model_name = $this->_dbinfo['class'];
+        /** @var ActiveRecord $model */
+        $model = $this->_dbinfo['class'];
+        $table = $model::tableName();
 
         $joins = array();
         $addColumns = array();
 
         if (empty($columns)) {
-            $calssCols = $model_name::getColumns();
+            $calssCols = $model::getColumns();
 
         } else {
             $calssCols = $columns;
         }
 
-        if (!empty($model_name::$fetchJoins)) $addJoins = $model_name::$fetchJoins;
-        if (!empty($model_name::$fetchColumns)) $addColumns = $model_name::$fetchColumns;
+        if (!empty($model::$fetchJoins))   $addJoins   = $model::$fetchJoins;
+        if (!empty($model::$fetchColumns)) $addColumns = $model::$fetchColumns;
 
         $columns = array();
         foreach ($calssCols as $col) {
@@ -288,17 +295,18 @@ abstract class Som_Model_Mapper_Abstract
         $res = $this->query($sql, $params);
         if ($res === false) {
             $array = $this->_adapter->errorInfo();
-            throw new Exception('SQL Error: ' . $array[2]);
+            throw new \Exception('SQL Error: ' . $array[2]);
         }
-        while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
-            $obj = new $model_name($row);
-            $objects[$row[$model_name::primaryKey()]] = $obj;
+        while ($row = $res->fetch(\PDO::FETCH_ASSOC)) {
+            $obj = new $model($row);
+            $objects[$row[$model::primaryKey()]] = $obj;
         }
 
         if ($res->closeCursor() === false) {
             $array = $this->_adapter->errorInfo();
-            throw new Exception('SQL Error: ' . $array[2]);
+            throw new \Exception('SQL Error: ' . $array[2]);
         }
+
         return (count($objects) > 0) ? $objects : null;
     }
 
@@ -308,16 +316,16 @@ abstract class Som_Model_Mapper_Abstract
      * @param string $table
      * @param $conditions
      *
-     * @throws Exception
+     * @throws \Exception
      * @return int
      */
     public final function getCount($table = '', $conditions)
     {
         $tq = $this->tableQuote;
-        if (empty($table)){
+        if (empty($table)) {
             $table = $this->_dbinfo['tbname'];
             if(!empty($this->_dbinfo['class'])){
-                /** @var Som_Model_ActiveRecord $model_name */
+                /** @var ActiveRecord $model_name */
                 $model_name = $this->_dbinfo['class'];
                 if (!empty($model_name::$fetchJoins)) $addJoins = $model_name::$fetchJoins;
             }
@@ -331,7 +339,7 @@ abstract class Som_Model_Mapper_Abstract
         $res = $this->query($sql, $params)->fetchColumn();
         if ($res === false) {
             $array = $this->_adapter->errorInfo();
-            throw new Exception('SQL Error: ' . $array[2]);
+            throw new \Exception('SQL Error: ' . $array[2]);
         }
         return intval($res);
     }
@@ -346,23 +354,23 @@ abstract class Som_Model_Mapper_Abstract
      * Performs single row INSERT if $data is an associative array,
      * performs multi-row INSERT if $data is a 2D array (numeric => assoc)
      *
-     * @param string|\Som_Model_ActiveRecord $table_name Table name
+     * @param string|ActiveRecord $table_name Table name
      * @param array|bool $data Associative or 2D array containing data for insertion.
      * @param bool $insert_null Insert SQL NULL for empty values rather than ignoring them.
      * @param bool $ignore Ignore duplicate key errors on insert
      * @param array $update_fields List of fields to be updated with ON DUPLICATE KEY UPDATE
      * @return int The number of affected records
-     * @throws Exception
+     * @throws \Exception
      */
     public function insert($table_name, $data = false, $insert_null = false, $ignore = false, $update_fields = array()) {
         $model = null;
         $tq = $this->tableQuote;
 
         $pkey = '';
-        if ($table_name instanceof Som_Model_ActiveRecord) {
+        if ($table_name instanceof ActiveRecord) {
             $model = $table_name;
-            $table_name = $this->_dbinfo['tbname'];
-            $pkey = $this->_dbinfo['pkey'];
+            $table_name = $model::tableName();
+            $pkey = $model::primaryKey();
 
             if (empty($data)) $data = $model->toArray();
         }
@@ -431,12 +439,12 @@ abstract class Som_Model_Mapper_Abstract
             }
 //            $this->_startTimer();
             /**
-             * @var PDOStatement $res ;
+             * @var \PDOStatement $res ;
              */
             $res = $this->_adapter->query($query);
             if ($res === false) {
                 $array = $this->_adapter->errorInfo();
-                throw new Exception('SQL Error: ' . $array[2]);
+                throw new \Exception('SQL Error: ' . $array[2]);
             }
 //            $this->_stopTimer($query);
 
@@ -480,19 +488,19 @@ abstract class Som_Model_Mapper_Abstract
      * - PHP NULL => SQL NULL
      * - 'NOW()' => SQL NOW()
      *
-     * @param string|\Som_Model_ActiveRecord $table_name Table name
+     * @param string|ActiveRecord $table_name Table name
      * @param array|bool $data Associative or 2D array containing data for update
      * @param string $condition Body of SQL WHERE clause
      * @param array $parameters Array of statement input parameters, see http://www.php.net/manual/en/pdostatement.execute.php
      * @param bool $update_null Nullify cells which have null values in the array. By default they are skipped
      * @return int The number of affected records or FALSE on error
-     * @throws Exception
+     * @throws \Exception
      */
     public function update($table_name, $data = false, $condition = '', $parameters = array(), $update_null = false) {
         $model = null;
         $tq = $this->tableQuote;
 
-        if ($table_name instanceof Som_Model_ActiveRecord) {
+        if ($table_name instanceof ActiveRecord) {
             $model = $table_name;
             $table_name = $model::tableName();
             $pkey = $model::primaryKey();
@@ -514,7 +522,7 @@ abstract class Som_Model_Mapper_Abstract
             $fields = $model::fields();
             if (!empty($fields)) {
                 foreach ($fields as $name => $field) {
-                    if (isset($field['link']) && in_array($field['link']['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+                    if (isset($field['link']) && in_array($field['link']['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
                         $fieldData = $model->rawValue($name);
                         if (empty($fieldData)) $fieldData = null;
                         $this->saveXRef($field['link']["model"], $id, $fieldData, $name);
@@ -590,25 +598,24 @@ abstract class Som_Model_Mapper_Abstract
      * @param string $condition Body of WHERE clause
      * @param array $parameters Array of statement input parameters, see http://www.php.net/manual/en/pdostatement.execute.php
      * @return int Number of records removed on success or FALSE on error
-     * @throws Exception
+     * @throws \Exception
      */
     public function delete($table_name, $condition = '', $parameters = array()) {
         $model = null;
         $tq = $this->tableQuote;
 
-        if ($table_name instanceof Som_Model_ActiveRecord) {
+        if ($table_name instanceof ActiveRecord) {
             $model = $table_name;
-            $table_name = $this->_dbinfo['tbname'];
-            $pkey = $this->_dbinfo['pkey'];
+            $table_name = $model::tableName();
+            $pkey = $model::primaryKey();
 
-            if (empty($data)) $data = $model->toArray();
-            $id = $data[$pkey];
+            $id = $model->getId();
             $condition = "{$pkey}={$id}";
 
             $fields = $model->fieldList();
             if (!empty($fields)) {
                 foreach ($fields as $name => $field) {
-                    if ($field['type'] == 'link' && in_array($field['link']['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+                    if ($field['type'] == 'link' && in_array($field['link']['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
                         $this->deleteXRef($field['link']["model"], $id, $name);
                     }
                 }
@@ -623,14 +630,15 @@ abstract class Som_Model_Mapper_Abstract
             $this->_bindParams($stmt, $parameters);
             if ($stmt->execute() === false) {
                 $array = $this->_adapter->errorInfo();
-                throw new Exception('SQL Error: ' . $array[2]);
+                throw new \Exception('SQL Error: ' . $array[2]);
             }
             $res = $stmt->rowCount();
+
         } else {
             $res = $this->_adapter->exec($query);
             if ($res === false) {
                 $array = $this->_adapter->errorInfo();
-                throw new Exception('SQL Error: ' . $array[2]);
+                throw new \Exception('SQL Error: ' . $array[2]);
             }
         }
         return $res;
@@ -664,7 +672,7 @@ abstract class Som_Model_Mapper_Abstract
      * @param string $conditions
      * @param bool $inc
      * @return bool
-     * @throws Exception
+     * @throws \Exception
      */
     protected function incdec($tablename, $pairs, $conditions = '', $inc = true) {
         if (!empty($pairs)) {
@@ -678,7 +686,7 @@ abstract class Som_Model_Mapper_Abstract
             $res   = $this->_adapter->exec($query);
             if ($res === false) {
                 $array = $this->_adapter->errorInfo();
-                throw new Exception('SQL Error: ' . $array[2]);
+                throw new \Exception('SQL Error: ' . $array[2]);
             }
 
             return true;
@@ -709,7 +717,7 @@ abstract class Som_Model_Mapper_Abstract
         if (empty($field['type'])) return false;
 
         if ($field['type'] == 'link') {
-            if (in_array($field['link']['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
+            if (in_array($field['link']['relation'], array(\Som::TO_ONE, \Som::TO_ONE_NULL))) {
                 $field['type'] = 'bigint';
             } else {
                 return false;
@@ -740,7 +748,7 @@ abstract class Som_Model_Mapper_Abstract
         $res = $this->_adapter->query($sql);
         if ($res === false) {
             $array = $this->_adapter->errorInfo();
-            throw new Exception('SQL Error: ' . $array[2]);
+            throw new \Exception('SQL Error: ' . $array[2]);
         }
 
         return $res;
@@ -751,7 +759,7 @@ abstract class Som_Model_Mapper_Abstract
      *
      * @param mixed $conditions SQL WHERE conditions as string or numeric array of strings or array of arrays
      * @param array $params Optional PDO params to pass through
-     * @throws Exception
+     * @throws \Exception
      * @return array SQL WHERE part and PDO params
      * @todo описание условий
      */
@@ -772,10 +780,10 @@ abstract class Som_Model_Mapper_Abstract
      * @param array $params
      * @param int   $i              counter
      * @return null|string
-     * @throws Exception
+     * @throws \Exception
      */
     protected function parseCondition(&$conditions, &$params, &$joins, $i = 0) {
-        /** @var Som_Model_Abstract $class */
+        /** @var Model $class */
         $class = $this->_dbinfo['class'];
         $table = $this->_dbinfo['tbname'];
         if(empty($table) && !empty($class))  $table = $class::tableName();
@@ -826,21 +834,21 @@ abstract class Som_Model_Mapper_Abstract
 
 
                         // Если передали объект
-                        if ($condition[0] instanceof Som_Model_Abstract) {
+                        if ($condition[0] instanceof Model) {
                             $fields = $class::fieldList();
                             // todo дописать обработку полей
                             if (empty($condition[1])) {
                                 // Не передали поле, ищем первое попавшиеся
                                 $fld = $class::field($condition[0]);
                                 // todo exception
-                                if (empty($fld)) throw new Exception("В моделе '{$class}' нет связи с '" . get_class($condition[0]) . "'");
+                                if (empty($fld)) throw new \Exception("В моделе '{$class}' нет связи с '" . get_class($condition[0]) . "'");
                             } else {
                                 $fld = $class::field($condition[1]);
                                 if (empty($fld)) {
-                                    throw new Exception("В моделе '{$class}' поле '{$condition[1]}' не найдено");
+                                    throw new \Exception("В моделе '{$class}' поле '{$condition[1]}' не найдено");
                                 }
                                 if (!is_a($condition[0], $fld['model'])) {
-                                    throw new Exception("В условии выборки переданный объект класса '" . get_class($condition[0]) . "' не
+                                    throw new \Exception("В условии выборки переданный объект класса '" . get_class($condition[0]) . "' не
                                 соответствует модели '{$fld['model']}' связанной c полем '{$condition[1]}'");
                                 }
                             }
@@ -910,12 +918,11 @@ abstract class Som_Model_Mapper_Abstract
     /**
      * Parse Order clause
      * @param string|array $order
-     * @throws Exception
+     * @throws \Exception
      * @return string
      */
     public function parseOrder($order)
     {
-
         // Если передали строку
         if (!is_array($order)) {
             return $order;
@@ -926,13 +933,15 @@ abstract class Som_Model_Mapper_Abstract
             foreach ($order as $cond) {
                 if (is_string($cond)) {
                     $ord[] = $cond;
+
                 } elseif (is_array($cond)) {
                     if (empty($cond[1])) {
                         $cond[1] = 'ASC';
+
                     } else {
                         $cond[1] = trim(strtoupper($cond[1]));
                         if (!in_array($cond[1], array('ASC', 'DESC'))) {
-                            throw new Exception("Wrong order direct '{$cond[1]}'. Must be 'ASC', 'DESC' or empty ");
+                            throw new \Exception("Wrong order direct '{$cond[1]}'. Must be 'ASC', 'DESC' or empty ");
                         }
                     }
                     // todo проверка существования колонки $cond[0]
@@ -940,10 +949,11 @@ abstract class Som_Model_Mapper_Abstract
                 }
 
             }
+
             if (count($ord) > 0) return implode(', ', $ord);
+
             return '';
         }
-
     }
 
     /**
@@ -990,19 +1000,19 @@ abstract class Som_Model_Mapper_Abstract
     /**
      * Binds parameters to a statement
      *
-     * @param PDOStatement $statement PDO statement
+     * @param \PDOStatement $statement PDO statement
      * @param array $parameters Array of parameters, numeric or associative
-     * @throws Exception
+     * @throws \Exception
      */
     private function _bindParams($statement, $parameters)
     {
         $is_numeric = is_int(key($parameters));
         foreach ($parameters as $key => $val) {
-            $type = is_int($val) ? PDO::PARAM_INT : PDO::PARAM_STR;
+            $type = is_int($val) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
             $is_numeric ? $statement->bindValue($key + 1, $val, $type) : $statement->bindValue($key, $val, $type);
             if ($statement === false) {
                 $array = $this->_adapter->errorInfo();
-                throw new Exception('SQL Error: ' . $array[2]);
+                throw new \Exception('SQL Error: ' . $array[2]);
             }
         }
     }
@@ -1010,52 +1020,38 @@ abstract class Som_Model_Mapper_Abstract
     /**
      * Load relationship
      *
-     * @param string|Som_Model_ActiveRecord $xModel
+     * @param string|ActiveRecord $xModel
      * @param $id
      * @param string $fieldName
      * @return array|bool|null
+     * @throws \Exception
      */
     public function loadXRef($xModel, $id, $fieldName = '')
     {
-        global $db_x;
-
-        $tq = $this->tableQuote;
-
-        if (is_string($xModel) || ($xModel instanceof Som_Model_Abstract)) {
-            /** @var Som_Model_ActiveRecord $xModel */
+        if (is_string($xModel) || ($xModel instanceof ActiveRecord)) {
+            /** @var ActiveRecord $xModel */
             $xPk = $xModel::primaryKey();
             $linkModelDbInfo = $xModel::getDbConfig();
 
             $xTableName = $linkModelDbInfo['tbname'];
-        }else{
+
+        } else {
             return false;
         }
 
         $tableName = $this->_dbinfo['tbname'];
 
-        // Remove prefixes of table names
-        $tableName  = preg_replace("/^$db_x/iu", '', $tableName);
-        $xTableName = preg_replace("/^$db_x/iu", '', $xTableName);
-
         $pk = $this->_dbinfo['pkey'];
-        $pKey  = mb_strtolower($tableName . '_' . $pk);
-        $xPKey = mb_strtolower($xTableName . '_' . $xPk);
 
-        $xRefTableName1 = $db_x.mb_strtolower("{$tableName}_link_{$xTableName}");
-        $xRefTableName2 = $db_x.mb_strtolower("{$xTableName}_link_{$tableName}");
+        $junctionTable = $this->junctionTable($tableName, $xTableName, $pk, $xPk);
+        if(!$this->tableExists($junctionTable['name'])) return null;
 
-        $xRefTable = false;
-        if ($this->tableExists($xRefTableName1)) {
-            $xRefTable = $xRefTableName1;
-        } elseif ($this->tableExists($xRefTableName2)) {
-            $xRefTable = $xRefTableName2;
-        }
-        if (!$xRefTable) return false;
+        $query = "SELECT ".$this->quoteIdentifier($junctionTable['relatedKey']).
+            " FROM ".$this->quoteIdentifier($junctionTable['name']).
+            " WHERE ".$this->quoteIdentifier($junctionTable['ownerKey'])."={$id} AND ".
+            $this->quoteIdentifier('name')."=".$this->quote($fieldName);
 
-        $query = "SELECT ".$this->quoteIdentifier($xPKey)." FROM ".$this->quoteIdentifier($xRefTable).
-            " WHERE ".$this->quoteIdentifier($pKey)."={$id} AND ".$this->quoteIdentifier('name')."=".$this->quote($fieldName);
-
-        $xRefs = $this->query($query)->fetchAll(PDO::FETCH_COLUMN);
+        $xRefs = $this->query($query)->fetchAll(\PDO::FETCH_COLUMN);
 
         if (count($xRefs) <= 0) return null;
 
@@ -1065,22 +1061,23 @@ abstract class Som_Model_Mapper_Abstract
     /**
      * Save relationship between two models
      *
-     * @param string|Som_Model_ActiveRecord $xModel
+     * @param string|ActiveRecord $xModel
      * @param $id
      * @param $data
      * @param string $fieldName
      * @return bool
-     * @throws Exception
+     * @throws \Exception
      */
     protected function saveXRef($xModel, $id, $data, $fieldName = '')
     {
-        if (is_string($xModel) || ($xModel instanceof Som_Model_ActiveRecord)) {
-            /** @var Som_Model_ActiveRecord $xModel */
+        if (is_string($xModel) || ($xModel instanceof ActiveRecord)) {
+            /** @var ActiveRecord $xModel */
             $xPk = $xModel::primaryKey();
             $linkModelDbInfo = $xModel::getDbConfig();
 
             $xTableName = $linkModelDbInfo['tbname'];
-        }else{
+
+        } else {
             return false;
         }
 
@@ -1094,68 +1091,51 @@ abstract class Som_Model_Mapper_Abstract
      * Save relationship between two DB tables
      *
      * @param $table
-     * @param $rTable
+     * @param $relatedTable
      * @param $pkey
-     * @param $rPkey
+     * @param $relatedPkey
      * @param $id
      * @param $data
      * @param $fieldName
      * @return bool
-     * @throws Exception
+     * @throws \Exception
      */
-    public function saveRelations($table, $rTable, $id, $data, $fieldName = '',  $pkey = 'id', $rPkey = 'id')
+    public function saveRelations($table, $relatedTable, $id, $data, $fieldName = '',  $pkey = 'id', $relatedPkey = 'id')
     {
-        global $db_x;
-        $tq = $this->tableQuote;
+        $junctionTable = $this->junctionTable($table, $relatedTable, $pkey, $relatedPkey);
 
-        // Remove prefixes of table names
-        $table  = preg_replace("/^$db_x/iu", '', $table);
-        $rTable = preg_replace("/^$db_x/iu", '', $rTable);
+        $priKey  = $junctionTable['ownerKey'];
+        $relatedPriKey = $junctionTable['relatedKey'];
 
-        $priKey  = mb_strtolower($table . '_' . $pkey);
-        $rPriKey = mb_strtolower($rTable . '_' . $rPkey);
-
-        $xRefTableName1 = $db_x.mb_strtolower("{$table}_link_{$rTable}");
-        $xRefTableName2 = $db_x.mb_strtolower("{$rTable}_link_{$table}");
-
-        $xRefTable = false;
-        if ($this->tableExists($xRefTableName1)) {
-            $xRefTable = $xRefTableName1;
-        } elseif ($this->tableExists($xRefTableName2)) {
-            $xRefTable = $xRefTableName2;
-        } else {
-            // Создать таблицу
-            $xRefTable = $xRefTableName1;
-            $this->createTable($xRefTable, array(
-                'xref_id' =>
-                    array(
-                        'name' => 'xref_id',
-                        'type' => 'int',
-                        'primary' => true,
-                    ),
-                $priKey =>
-                    array(
-                        'name' => $priKey,
-                        'type' => 'int',
-                    ),
-                $rPriKey =>
-                    array(
-                        'name' => $rPriKey,
-                        'type' => 'int',
-                    ),
-                'name' =>
-                    array(
-                        'name' => 'name',
-                        'type' => 'varchar',
-                    )
-            ));
+        // Create junction table if it is not exists
+        if(!$this->tableExists($junctionTable['name'])) {
+            $this->createTable($junctionTable['name'], [
+                'xref_id' => [
+                    'name' => 'xref_id',
+                    'type' => 'int',
+                    'primary' => true,
+                ],
+                $priKey => [
+                    'name' => $priKey,
+                    'type' => 'int',
+                ],
+                $relatedPriKey => [
+                    'name' => $relatedPriKey,
+                    'type' => 'int',
+                ],
+                'name' => [
+                    'name' => 'name',
+                    'type' => 'varchar',
+                ]
+            ]);
         }
 
-        // Сохраняем связи
-        $query = "SELECT ".$this->quoteIdentifier($rPriKey)." FROM $xRefTable WHERE ".$this->quoteIdentifier($priKey).
-            "={$id} AND ".$this->quoteIdentifier('name')."=".$this->quote($fieldName);
+        // Save relations
+        $query = "SELECT ".$this->quoteIdentifier($relatedPriKey)." FROM {$junctionTable['name']} WHERE ".
+            $this->quoteIdentifier($priKey)."={$id} AND ".
+            $this->quoteIdentifier('name')."=".$this->quote($fieldName);
 
-        $old_xRefs = $this->query($query)->fetchAll(PDO::FETCH_COLUMN);
+        $old_xRefs = $this->query($query)->fetchAll(\PDO::FETCH_COLUMN);
 
         if (!$old_xRefs) $old_xRefs = array();
         $kept_xRefs = array();
@@ -1177,11 +1157,12 @@ abstract class Som_Model_Mapper_Abstract
             }
         }
 
-        // Remove old links that have been removed
+        // Remove old relations that have been removed
         $rem_xRefs = array_diff($old_xRefs, $kept_xRefs);
         if (count($rem_xRefs) > 0) {
             $inCond = "(" . implode(",", $this->quote($rem_xRefs)) . ")";
-            $this->delete($xRefTable, "{$priKey}=$id AND {$rPriKey} IN $inCond AND ".$this->quoteIdentifier('name')."=".$this->quote($fieldName));
+            $this->delete($junctionTable['name'], "{$priKey}=$id AND {$relatedPriKey} IN $inCond AND ".
+                $this->quoteIdentifier('name')."=".$this->quote($fieldName));
         }
 
         // Add new xRefs
@@ -1191,14 +1172,14 @@ abstract class Som_Model_Mapper_Abstract
             if ((!$isStr && $item > 0) || ($isStr && $item != '')) {
                 $upData = array(
                     $priKey => $id,
-                    $rPriKey => $item,
+                    $relatedPriKey => $item,
                     'name' => $fieldName
                 );
-                $res = $this->insert($xRefTable, $upData);
+                $res = $this->insert($junctionTable['name'], $upData);
 
                 if ($res === false) {
                     $error = $this->_adapter->errorInfo();
-                    throw new Exception("SQL Error {$error[0]}: {$error[2]}");
+                    throw new \Exception("SQL Error {$error[0]}: {$error[2]}");
                 };
             }
         }
@@ -1209,15 +1190,15 @@ abstract class Som_Model_Mapper_Abstract
     /**
      * Destroys the relationship between two models.
      *
-     * @param string|Som_Model_ActiveRecord $xModel
+     * @param string|ActiveRecord $xModel
      * @param $id
      * @param string $fieldName
      * @return bool
      */
     protected function deleteXRef($xModel, $id, $fieldName = '')
     {
-        if (is_string($xModel) || ($xModel instanceof Som_Model_ActiveRecord)) {
-            /** @var Som_Model_ActiveRecord $xModel */
+        if (is_string($xModel) || ($xModel instanceof ActiveRecord)) {
+            /** @var ActiveRecord $xModel */
             $xPk        = $xModel::primaryKey();
             $xTableName = $xModel::tableName();
 
@@ -1235,53 +1216,81 @@ abstract class Som_Model_Mapper_Abstract
      * Destroys the relationship between two DB tables.
      *
      * @param string $table
-     * @param string $rTable        Связь с этой таблицей будет удалена
+     * @param string $relatedTable  Связь с этой таблицей будет удалена
      * @param int    $id            Primary key value from the $table
      * @param string $fieldName
      * @param string $pkey
-     * @param string $rPkey
-     * @throws Exception
+     * @param string $relatedPkey
+     * @throws \Exception
      */
-    public function deleteRelations($table, $rTable, $id, $fieldName = '',  $pkey = 'id', $rPkey = 'id')
+    public function deleteRelations($table, $relatedTable, $id, $fieldName = '',  $pkey = 'id', $relatedPkey = 'id')
+    {
+        $junctionTable = $this->junctionTable($table, $relatedTable, $pkey, $relatedPkey);
+
+        $priKey = $junctionTable['ownerKey'];
+
+        if ($this->tableExists($junctionTable['name'])) {
+            $this->delete($junctionTable['name'], "{$priKey}=$id AND ".
+                $this->quoteIdentifier('name')."=".$this->quote($fieldName));
+        }
+    }
+
+    /**
+     * Get the joining table name for a many-to-many relation.
+     *
+     * The junction table name, by convention, is simply the table names
+     * sorted alphabetically and concatenated with an underscore.
+     *
+     * @param string $table
+     * @param string $relatedTable
+     * @param string $primaryKey
+     * @param string $relatedPrimaryKey
+     * @return array
+     */
+    public function junctionTable($table, $relatedTable, $primaryKey = 'id', $relatedPrimaryKey = 'id')
     {
         global $db_x;
 
         // Remove prefixes of table names
         $table = preg_replace("/^$db_x/iu", '', $table);
-        $rTable = preg_replace("/^$db_x/iu", '', $rTable);
+        $relatedTable = preg_replace("/^$db_x/iu", '', $relatedTable);
 
-        $priKey = mb_strtolower($table . '_' . $pkey);
-        $rPriKey = mb_strtolower($rTable . '_' . $rPkey);
+        $tables = [
+            $table,
+            $relatedTable,
+        ];
 
-        $xRefTableName1 = $db_x . mb_strtolower("{$table}_link_{$rTable}");
-        $xRefTableName2 = $db_x . mb_strtolower("{$rTable}_link_{$table}");
+        sort($tables);
 
-        if ($this->tableExists($xRefTableName1)) {
-            $this->delete($xRefTableName1, "{$priKey}=$id AND ".$this->quoteIdentifier('name')."=".$this->quote($fieldName));
-        }
-        if ($this->tableExists($xRefTableName2)) {
-            $this->delete($xRefTableName2, "{$priKey}=$id AND ".$this->quoteIdentifier('name')."=".$this->quote($fieldName));
-        }
+        $ret = [
+            'name' => $db_x.strtolower(implode('_', $tables)),
+            'ownerKey' => mb_strtolower(Inflector::singularize($table) . '_' . $primaryKey),
+            'relatedKey' => mb_strtolower(Inflector::singularize($relatedTable) . '_' . $relatedPrimaryKey),
+        ];
+
+        return $ret;
     }
 
     /**
      * Parses PDO exception message and returns its components and status
      *
-     * @param PDOException $e PDO Exception
+     * @param \PDOException $e PDO Exception
      * @param string $err_code Output error code parameter
      * @param string $err_message Output error message parameter
      * @return bool TRUE for error cases, FALSE for notifications and warnings
      */
-    private function _parseError(PDOException $e, &$err_code, &$err_message)
+    private function _parseError(\PDOException $e, &$err_code, &$err_message)
     {
         $pdo_message = $e->getMessage();
         if (preg_match('#SQLSTATE\[(\w+)\].*?: (.*)#', $pdo_message, $matches)) {
             $err_code = $matches[1];
             $err_message = $matches[2];
+
         } else {
             $err_code = $e->getCode();
             $err_message = $pdo_message;
         }
+
         return $err_code > '02';
     }
 

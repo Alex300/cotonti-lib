@@ -64,6 +64,7 @@ if(!function_exists('mb_lcfirst')) {
  * @return string
  *
  * Todo check if russian settings are right
+ * Todo use \Helpers\Inflector::transliterate()
  */
 function cot_transliterate($string, $transliterator = null)
 {
@@ -74,8 +75,8 @@ function cot_transliterate($string, $transliterator = null)
     if(is_array($cot_translit_custom)) return strtr($string, $cot_translit_custom);
 
     if (extension_loaded('intl')) {
-        if($transliterator === null) $transliterator = $cot_transliterator;
-        if ($transliterator === null)  $transliterator = 'Any-Latin; Latin-ASCII; [\u0080-\uffff] remove';
+        if ($transliterator === null) $transliterator = $cot_transliterator;
+        if ($transliterator === null) $transliterator = 'Any-Latin; Latin-ASCII; [\u0080-\uffff] remove';
 
         return transliterator_transliterate($transliterator, $string);
     }
@@ -87,10 +88,6 @@ function cot_transliterate($string, $transliterator = null)
     return $string;
 }
 
-function cot_slug($string)
-{
-
-}
 
 /**
  * Standard var_dump with <pre>

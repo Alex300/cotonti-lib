@@ -1,44 +1,51 @@
 <?php
+
+namespace Som\Adapter;
+
+use \Som\Adapter;
+
 /**
- * MySql Mapper
+ * MySql Adapter
  * @author Kalnov Alexey http://portal30.ru
  */
-class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
+class Mysql extends Adapter
+{
 
     protected $tableQuote = '`';
 
     /**
      * Connect to Data Base
      * @param $dbc
-     * @return PDO
+     * @return \PDO
      */
-    protected static function connect($dbc) {
-        if (empty(Som_Model_Mapper_Abstract::$connections[$dbc])) {
-
+    protected static function connect($dbc)
+    {
+        if (empty(Adapter::$connections[$dbc])) {
             // Connect to DB
             if($dbc == 'db'){
                 // Default cotonti connection
-                Som_Model_Mapper_Abstract::$connections[$dbc] = cot::$db;
-            }else{
+                Adapter::$connections[$dbc] = \cot::$db;
+
+            } else {
                 // Альтернативное соединение из конфига
                 $options = array();
-                if (!empty(cot::$cfg[$dbc]['charset'])) {
-                    $collation_query = "SET NAMES '".cot::$cfg[$dbc]['charset']."'";
-                    if (!empty(cot::$cfg[$dbc]['collate']) )  {
-                        $collation_query .= " COLLATE '".cot::$cfg[$dbc]['collate']."'";
+                if (!empty(\cot::$cfg[$dbc]['charset'])) {
+                    $collation_query = "SET NAMES '".\cot::$cfg[$dbc]['charset']."'";
+                    if (!empty(\cot::$cfg[$dbc]['collate']) )  {
+                        $collation_query .= " COLLATE '".\cot::$cfg[$dbc]['collate']."'";
                     }
-                    $options[PDO::MYSQL_ATTR_INIT_COMMAND] = $collation_query;
+                    $options[\PDO::MYSQL_ATTR_INIT_COMMAND] = $collation_query;
                 }
 
-                $dbc_port = empty(cot::$cfg[$dbc]['port']) ? '' : ';port=' . cot::$cfg[$dbc]['port'];
-                $dsn = cot::$cfg[$dbc]['adapter'] . ':host=' . cot::$cfg[$dbc]['host'] . $dbc_port .
-                    ';dbname=' . cot::$cfg[$dbc]['dbname'];
-                Som_Model_Mapper_Abstract::$connections[$dbc] = new PDO($dsn, cot::$cfg[$dbc]['username'],
-                    cot::$cfg[$dbc]['password'], $options);
+                $dbc_port = empty(\cot::$cfg[$dbc]['port']) ? '' : ';port=' . \cot::$cfg[$dbc]['port'];
+                $dsn = \cot::$cfg[$dbc]['adapter'] . ':host=' . \cot::$cfg[$dbc]['host'] . $dbc_port .
+                    ';dbname=' . \cot::$cfg[$dbc]['dbname'];
+                Adapter::$connections[$dbc] = new \PDO($dsn, \cot::$cfg[$dbc]['username'],
+                    \cot::$cfg[$dbc]['password'], $options);
             }
         }
 
-        return Som_Model_Mapper_Abstract::$connections[$dbc];
+        return Adapter::$connections[$dbc];
     }
 
 
@@ -68,7 +75,7 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
      *
      * @param string $tableName
      * @param string $schemaName OPTIONAL
-     * @throws Exception
+     * @throws \Exception
      * @return array
      */
     public function describeTable($tableName, $schemaName = null)
@@ -95,7 +102,7 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
             $queryResult->closeCursor();
         } else {
             $array = $this->_adapter->errorInfo();
-            throw new Exception('SQL Error: ' . $array[2]);
+            throw new \Exception('SQL Error: ' . $array[2]);
         }
 
         $desc = array();
@@ -119,14 +126,17 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
             if (preg_match('/^((?:var)?char)\((\d+)\)/', $row['Type'], $matches)) {
                 $row['Type'] = $matches[1];
                 $row['Length'] = $matches[2];
+
             } else if (preg_match('/^decimal\((\d+),(\d+)\)/', $row['Type'], $matches)) {
                 $row['Type'] = 'decimal';
                 $row['Precision'] = $matches[1];
                 $row['Scale'] = $matches[2];
+
             } else if (preg_match('/^float\((\d+),(\d+)\)/', $row['Type'], $matches)) {
                 $row['Type'] = 'float';
                 $row['Precision'] = $matches[1];
                 $row['Scale'] = $matches[2];
+
             } else if (preg_match('/^((?:big|medium|small|tiny)?int)\((\d+)\)/', $row['Type'], $matches)) {
                 $row['Type'] = $matches[1];
                 /**
@@ -139,6 +149,7 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
                 $row['PrimaryPosition'] = $p;
                 if ($row['Extra'] == 'auto_increment') {
                     $row['Identity'] = true;
+
                 } else {
                     $row['Identity'] = false;
                 }
@@ -165,7 +176,8 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
         return $desc;
     }
 
-    public function lastInsertId($table_name = '', $pkey = ''){
+    public function lastInsertId($table_name = '', $pkey = '')
+    {
         return $this->_adapter->lastInsertId();
     }
 
@@ -175,7 +187,8 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
      * @param string $schema
      * @return array
      */
-    public function tables($schema = ''){
+    public function tables($schema = '')
+    {
         return $this->query('SHOW TABLES')->fetchColumn();
     }
 
@@ -184,13 +197,15 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
      * @param $table
      * @return bool
      */
-    public function tableExists($table = false){
+    public function tableExists($table = false)
+    {
         if(!$table) $table = $this->_dbinfo['tbname'];
         $res = $this->query("SHOW TABLES LIKE ".$this->quote($table))->fetchAll();
         return !empty($res);
     }
 
-    public function createTable($table = '', $fields = array()){
+    public function createTable($table = '', $fields = array())
+    {
         $tq =    $this->tableQuote;
 
         if(empty($table)) $table = $this->_dbinfo['tbname'];
@@ -226,15 +241,16 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
     }
 
 
-    public function fieldExists($field_name, $table = '')    {
+    public function fieldExists($field_name, $table = '')
+    {
         $tq =    $this->tableQuote;
         if(empty($table)) $table = $this->_dbinfo['tbname'];
 
         return $this->query("SHOW COLUMNS FROM {$tq}{$table}{$tq} WHERE Field = " . $this->quote($field_name))->rowCount() == 1;
     }
 
-    public function alterField($old, $new = false){
-
+    public function alterField($old, $new = false)
+    {
         if(empty($old)) return false;
         //if (empty($new)) $new = $old;   // Меняем определение поля
 
@@ -274,7 +290,8 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
 
         if(empty($new['type']) || empty($new['length']) || !isset($new['nullable']) || !isset($new['default'])){
             // Получить данные из поля
-            $res = $this->query("SHOW COLUMNS FROM `{$this->_dbinfo['tbname']}` LIKE '{$old['name']}'")->fetch(PDO::FETCH_ASSOC);
+            $res = $this->query("SHOW COLUMNS FROM `{$this->_dbinfo['tbname']}` LIKE '{$old['name']}'")
+                ->fetch(\PDO::FETCH_ASSOC);
             preg_match('/([\w]+)[(]([\d]+)[)]/i', $res["Type"], $mathces);
             if(empty($new['type'])) $new['type'] = $mathces[1];
             if(empty($new['length']) && !empty($mathces[2])) $new['length'] = $mathces[2];
@@ -304,8 +321,8 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
 
     }
 
-    public function deleteField($field){
-
+    public function deleteField($field)
+    {
         if(!$this->fieldExists($field)) return false;
         $this->query("ALTER TABLE `{$this->_dbinfo['tbname']}` DROP $field");
     }
@@ -316,8 +333,8 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
      * @param string $table
      * @return array
      */
-    public function getFields($table = '') {
-
+    public function getFields($table = '')
+    {
         if(!$table) $table = $this->_dbinfo['tbname'];
 
         $tq = $this->tableQuote;
@@ -325,7 +342,7 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
         $keyName = 'SomModelMySqlFields' . $table;
 //        if (($fields=LaCache::load($keyName))===false) {
         $sql = "SHOW COLUMNS FROM {$tq}{$table}{$tq}";
-        $fields = $this->query($sql)->fetchAll(PDO::FETCH_COLUMN);
+        $fields = $this->query($sql)->fetchAll(\PDO::FETCH_COLUMN);
 //            LaCache::save($fields, $keyName);
 //        }
 
@@ -333,9 +350,7 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
     }
 
 
-    public function renameTable($tablename = '', $newtablename=''){
-
-    }
+    public function renameTable($tablename = '', $newtablename='') { }
 
     /**
      * Специальный обработик bool полей для специфических баз.
@@ -343,9 +358,9 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
      * @param mixed $data
      * @return array|string
      */
-    public function quote($data){
-        if (is_bool($data))
-            $data = $data ? 1 : 0;
+    public function quote($data)
+    {
+        if (is_bool($data)) $data = $data ? 1 : 0;
         return parent::quote($data);
     }
  }

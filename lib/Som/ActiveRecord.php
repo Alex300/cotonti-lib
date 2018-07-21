@@ -1,5 +1,9 @@
 <?php
 
+namespace Som;
+
+use \Helpers\Inflector;
+
 /**
  * ORM System
  * SOM - Simple Object Manipulation
@@ -12,14 +16,26 @@
  * @author Kalnov Alexey <kalnov_alexey@yandex.ru> http://portal30.ru
  *
  */
-abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
+abstract class ActiveRecord extends Model
 {
     /**
-     * @var Som_Model_Mapper_Abstract
+     * @var Adapter
      */
     protected static $_db = null;
-    protected static $_tbname = null;
-    protected static $_primary_key = null;
+
+    /**
+     * @var string Table name
+     * If it is not set by tableName() method returns the class name as the table name by calling [[Inflector::tableize()]]
+     * @see tableName()
+     */
+    protected static $_tableName = null;
+
+    /**
+     * @var string Primary key.
+     * You do not need to fill this field. It will be filled in automatically.
+     * @see primaryKey()
+     */
+    protected static $_primaryKey = null;
 
     const EVENT_BEFORE_SAVE   = 'beforeSave';
     const EVENT_AFTER_SAVE    = 'afterSave';
@@ -61,31 +77,41 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * Static constructor
      * @param string $db Data base connection config name
      * Модель не проверяет наличие таблицы и всех полей, а наивно доверяет данным из метода fieldList()
-     * @throws Exception
+     * @throws \Exception
      */
-    public static function __init($db = 'db'){
-
+    public static function __init($db = 'db')
+    {
         if($db == 'db') {
             static::$_dbtype = 'mysql';
+
         } else {
-            if(empty(cot::$cfg[$db]) || empty(cot::$cfg[$db]['adapter'])) {
-                throw new Exception('Connection config not found in $cfg['.$db.']');
+            if(empty(\cot::$cfg[$db]) || empty(\cot::$cfg[$db]['adapter'])) {
+                throw new \Exception('Connection config not found in $cfg['.$db.']');
             }
 
-            static::$_dbtype = cot::$cfg[$db]['adapter'];
+            static::$_dbtype = \cot::$cfg[$db]['adapter'];
         }
-        static::$_db = $dbAdapter = static::getAdapter($db);
+
+        // Todo не нужно передавать этот массив с параметрами
+        static::$_db = $dbAdapter = \Som::getAdapter($db, [
+            "class"  => get_called_class(),
+            "tbname" => static::tableName(),
+            "pkey"   => static::primaryKey(),
+        ]);
 
         $className = get_called_class();
         self::$_extraFields[$className] = array();
 
-        // load Extrafields
-        if(!empty(cot::$extrafields[static::$_tbname])) {
+        $tableName  = static::tableName();
+        $primaryKey = static::primaryKey();
+
+        // Load extrafields
+        if(!empty(\cot::$extrafields[$tableName])) {
             // Не очень хорошее решение, но в Cotonti имена полей хранятся без префиска.
-            $column_prefix = substr(static::$_primary_key, 0, strpos(static::$_primary_key, "_"));
+            $column_prefix = substr($primaryKey, 0, strpos($primaryKey, "_"));
             $column_prefix = (!empty($column_prefix)) ? $column_prefix.'_' : '';
 
-            foreach(cot::$extrafields[static::$_tbname] as $key => $field) {
+            foreach(\cot::$extrafields[$tableName] as $key => $field) {
                 if(!array_key_exists($field['field_type'], $dbAdapter::$extraTypesMap)) continue;
                 $desc = cot_extrafield_title($field, $className.'_');
 
@@ -108,7 +134,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
     }
 
     /**
-     * @param Som_Model_ActiveRecord|array $data данные для инициализации модели
+     * @param ActiveRecord|array $data данные для инициализации модели
      */
     public function __construct($data = null)
     {
@@ -142,7 +168,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         // Для существующих объектов грузим Многие ко многим (только id)
         if (is_array($data) && isset($data[$pkey]) && $data[$pkey] > 0 && !empty($fields)) {
             foreach ($fields as $key => $field) {
-                if (isset($field['link']) && in_array($field['link']['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+                if (isset($field['link']) && in_array($field['link']['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
                     $this->_linkData[$key] = static::$_db->loadXRef($field['link']["model"], $data[$pkey], $key);
                 }
             }
@@ -155,7 +181,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * This method is overridden so that attributes and related objects can be accessed like properties.
      *
      * @param string $name The property name
-     * @return null|mixed|Som_Model_Abstract
+     * @return null|mixed|Model
      */
     public function __get($name)
     {
@@ -178,19 +204,19 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         if (isset($fields[$name]) && $fields[$name]['type'] == 'link') {
             $list = (array)$fields[$name]['link'];
 
-            /** @var Som_Model_ActiveRecord $modelName */
+            /** @var ActiveRecord $modelName */
             $modelName = $list['model'];
             $localkey = !empty($list['localKey']) ? $list['localKey'] : $name;
 
             // Один ко многим
-            if (in_array($list['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
+            if (in_array($list['relation'], array(\Som::TO_ONE, \Som::TO_ONE_NULL))) {
                 if (empty($this->_data[$localkey])) return null;
 
                 return $modelName::getById($this->_data[$localkey]);
             }
 
             // Многие ко многим
-            if (in_array($list['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+            if (in_array($list['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
                 if (!empty($this->_linkData[$name]) && is_array($this->_linkData[$name]) && count($this->_linkData[$name]) > 0) {
                     // ХЗ как лучше, find или в цикле getById (getById кешируется на время выполенния, но за раз много запрсов)
                     return $modelName::findByCondition(array(
@@ -215,7 +241,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      *
      * @param string $name Property name
      * @param mixed $value Property value
-     * @throws Exception
+     * @throws \Exception
      */
     public function __set($name, $value)
     {
@@ -232,15 +258,15 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         // Set old data
         if(isset($fields[$name]) && !isset($this->_oldData[$name])) {
             if($link) {
-                if (in_array($link['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+                if (in_array($link['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
                     $newData = $value;
                     $oldData = (isset($this->_linkData[$name])) ? $this->_linkData[$name] : null;
                     if(!is_array($newData)) $newData = array($newData);
                     if(!is_array($oldData)) $oldData = array($oldData);
                     if(!static::compareArrays($oldData, $newData)) $this->_oldData[$name] = $oldData;
 
-                } elseif(in_array($link['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
-                    if ($value instanceof Som_Model_Abstract) {
+                } elseif(in_array($link['relation'], array(\Som::TO_ONE, \Som::TO_ONE_NULL))) {
+                    if ($value instanceof Model) {
                         if($this->_data[$localkey] != $value->getId()) {
                             $this->_oldData[$name] = $this->_data[$localkey];
                         }
@@ -276,7 +302,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         } elseif (strncmp($name, 'as ', 3) === 0) {
             // as behavior: attach behavior
             $name = trim(substr($name, 3));
-            $this->attachBehavior($name, $value instanceof Behavior ? $value : new $value() );
+            $this->attachBehavior($name, $value instanceof \Behavior ? $value : new $value() );
             return;
 
         }
@@ -291,18 +317,18 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         }
 
         // если передали объект, Один ко многим
-        if ($value instanceof Som_Model_Abstract) {
+        if ($value instanceof Model) {
             // Проверка типа
             if ($link) {
                 if ($value instanceof $className) {
                     $value = $value->getId();
 
                 } else {
-                    throw new Exception("Тип переданного значения не соответствует пипу поля. Должно быть: $className");
+                    throw new \Exception("Тип переданного значения не соответствует пипу поля. Должно быть: $className");
                 }
 
             } elseif (in_array($name, static::getColumns())) {
-                throw new Exception("Связь для поля '{$name}' не найдена");
+                throw new \Exception("Связь для поля '{$name}' не найдена");
             }
         }
 
@@ -310,11 +336,11 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         // Если это связь
         if ($link) {
             // Один ко многим
-            if (in_array($link['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
+            if (in_array($link['relation'], array(\Som::TO_ONE, \Som::TO_ONE_NULL))) {
                 $this->_data[$localkey] = $value;
                 return;
             }
-            if (in_array($link['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+            if (in_array($link['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
                 if (!is_array($value)) $value = array($value);
                 $this->_linkData[$name] = array();
                 foreach ($value as $valRow) {
@@ -394,12 +420,12 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
 
             $localkey = !empty($list['localKey']) ? $list['localKey'] : $name;
             // Один ко многим
-            if (in_array($list['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
+            if (in_array($list['relation'], array(\Som::TO_ONE, \Som::TO_ONE_NULL))) {
                 return !empty($this->_data[$localkey]);
             }
 
             // Многие ко многим
-            if (in_array($list['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+            if (in_array($list['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
                 return !empty($this->_linkData[$name]);
             }
         }
@@ -411,7 +437,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
             $tmp = $this->__get($name);
             return $tmp !== null;
 
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return false;
         }
     }
@@ -453,12 +479,12 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
 
             $localkey = !empty($list['localKey']) ? $list['localKey'] : $name;
             // Один ко многим
-            if (in_array($list['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL))) {
+            if (in_array($list['relation'], array(\Som::TO_ONE, \Som::TO_ONE_NULL))) {
                 unset($this->_data[$localkey]);
             }
 
             // Многие ко многим
-            if (in_array($list['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+            if (in_array($list['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
                 unset($this->_linkData[$name]);
             }
         }
@@ -487,10 +513,10 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
     /**
      * Populates the model with input data.
      *
-     * @param array|Som_Model_ActiveRecord $data
+     * @param array|ActiveRecord $data
      * @param bool $safe безопасный режим
      *
-     * @throws Exception
+     * @throws \Exception
      * @return bool
      */
     public function setData($data, $safe = true)
@@ -505,12 +531,12 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         if ($data instanceof $class)
             $data = $data->toArray();
         if (!is_array($data)) {
-            throw new  Exception("Data must be an Array or instance of $class Class");
+            throw new  \Exception("Data must be an Array or instance of $class Class");
         }
         foreach ($data as $key => $value) {
             if ($safe && isset($fields[$key]['safe']) && $fields[$key]['safe']) {
-                if(!cot::$usr['isadmin'] && cot::$env['ext'] != 'admin'){
-                    throw new Exception("Trying to write value «{$value}» to protected field «{$key}» of model «{$class}»");
+                if(!\cot::$usr['isadmin'] && \cot::$env['ext'] != 'admin'){
+                    throw new \Exception("Trying to write value «{$value}» to protected field «{$key}» of model «{$class}»");
                 }
             }
             if ($key != static::primaryKey()) {
@@ -548,7 +574,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
                 $this->_data[$field] = $this->_data[$field] + $val;
             }
             $pkey = static::primaryKey();
-            return static::$_db->inc(static::$_tbname, $pair, " {$pkey} = {$this->getId()} " .$conditions);
+            return static::$_db->inc(static::tableName(), $pair, " {$pkey} = {$this->getId()} " .$conditions);
         }
     }
 
@@ -577,7 +603,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
             }
             $pkey = static::primaryKey();
 
-            return static::$_db->dec(static::$_tbname, $pair, " {$pkey} = {$this->getId()} " .$conditions);
+            return static::$_db->dec(static::tableName(), $pair, " {$pkey} = {$this->getId()} " .$conditions);
         }
     }
 
@@ -601,7 +627,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * @param mixed $pk Primary key
      * @param bool $staticCache Использовать кеш выборки?
      *
-     * @return Som_Model_ActiveRecord
+     * @return ActiveRecord
      */
     public static function getById($pk, $staticCache = true)
     {
@@ -625,7 +651,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * Получение единственного значения
      * @param array  $conditions
      * @param null   $order
-     * @return Som_Model_ActiveRecord
+     * @return ActiveRecord
      */
     public static function fetchOne($conditions = array(), $order = null)
     {
@@ -647,7 +673,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * @param int $offset Offset from where to begin returning objects
      * @param string $order Column name to order on
      *
-     * @return Som_Model_ActiveRecord[]
+     * @return ActiveRecord[]
      */
     public static function findByCondition($conditions = array(), $limit = 0, $offset = 0, $order = '')
     {
@@ -663,7 +689,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * @param int $offset Offset from where to begin returning objects
      * @param string $order Column name to order on
      *
-     * @return Som_Model_ActiveRecord[]
+     * @return ActiveRecord[]
      *
      * @deprecated. Use Som_Model_ActiveRecord::findByCondition() instead
      *
@@ -681,22 +707,23 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * @param int $offset
      * @param string $order
      * @param string $field
-     * @throws Exception
+     * @throws \Exception
      * @return array
      */
-    public static function keyValPairs($conditions = array(), $limit = 0, $offset = 0, $order = '', $field = null) {
+    public static function keyValPairs($conditions = array(), $limit = 0, $offset = 0, $order = '', $field = null)
+    {
 
         if(empty($field)) {
             $fields = static::fields();
             if(array_key_exists('title', $fields)) $field = 'title';
         }
         if(empty($field)) {
-            throw new Exception('Field Name is missing');
+            throw new \Exception('Field Name is missing');
         }
 
         if(empty($order)) $order = array(array($field, 'ASC'));
 
-        /** @var Som_Model_ActiveRecord $className */
+        /** @var ActiveRecord $className */
         $className = get_called_class();
 
         $items = $className::findByCondition($conditions, $limit, $offset, $order);
@@ -718,7 +745,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * @param int $offset Offset from where to begin returning objects
      * @param string $order Column name to order on
      *
-     * @return Som_Model_ActiveRecord[]
+     * @return ActiveRecord[]
      */
     protected static function fetch($conditions = array(), $limit = 0, $offset = 0, $order = '') {
         return static::$_db->fetch($conditions, $limit, $offset, $order);
@@ -735,7 +762,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         }
         /* ===== */
 
-        $event = new ModelEvent;
+        $event = new Event;
         $event->data['data'] = $data;
         $this->trigger(self::EVENT_BEFORE_SAVE, $event);
 
@@ -745,9 +772,9 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
     /**
      * Saves model data into the associated database table.
      *
-     * @param Som_Model_Mapper_Abstract|array|null $data
+     * @param Adapter|array|null $data
      * @return int id of saved record
-     * @throws Exception
+     * @throws \Exception
      */
     public function save($data = null)
     {
@@ -814,7 +841,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         }
         /* ===== */
 
-        $event = new ModelEvent;
+        $event = new Event;
         $this->trigger(self::EVENT_BEFORE_INSERT, $event);
 
         return $return && $event->isValid;
@@ -856,7 +883,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
 
         // Fill magic fields
         if(array_key_exists('updated',    $fields)) $this->_data['updated']    = date('Y-m-d H:i:s', cot::$sys['now']);
-        if(array_key_exists('updated_by', $fields)) $this->_data['updated_by'] = cot::$usr['id'];
+        if(array_key_exists('updated_by', $fields)) $this->_data['updated_by'] = \cot::$usr['id'];
 
         $return = true;
 
@@ -866,7 +893,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         }
         /* ===== */
 
-        $event = new ModelEvent;
+        $event = new Event;
         $this->trigger(self::EVENT_BEFORE_UPDATE, $event);
 
         return $return && $event->isValid;
@@ -911,13 +938,14 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * @param array $data       Values (name-value pairs) to be saved into the table
      * @param mixed $condition  Conditions that will be put in the WHERE part of the UPDATE SQL.
      * @return int Number of rows updated
-     * @throws Exception
+     * @throws \Exception
      */
     public static function updateAll($data, $condition = '', $params = array()){
         if (empty($data)) {
-            throw new Exception('$data is empty');
+            throw new \Exception('$data is empty');
         }
-        return static::$_db->update(static::$_tbname, $data, $condition, $params, true);
+
+        return static::$_db->update(static::tableName(), $data, $condition, $params, true);
     }
 
     protected function beforeDelete() {
@@ -931,7 +959,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         }
         /* ===== */
 
-        $event = new ModelEvent;
+        $event = new Event;
         $this->trigger(self::EVENT_BEFORE_DELETE, $event);
 
         return $return && $event->isValid;
@@ -946,12 +974,15 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
 
         if (!$this->validateDelete() || !$this->beforeDelete()) return false;
 
-        if(!empty($cot_extrafields[static::$_tbname])) {
+        $tableName  = static::tableName();
+        $primaryKey = static::primaryKey();
+
+        if(!empty($cot_extrafields[$tableName])) {
             // Не очень хорошее решение, но в Cotonti имена полей хранятся без префиска.
-            $column_prefix = substr(static::$_primary_key, 0, strpos(static::$_primary_key, "_"));
+            $column_prefix = substr($primaryKey, 0, strpos($primaryKey, "_"));
             $column_prefix = (!empty($column_prefix)) ? $column_prefix . '_' : '';
 
-            foreach($cot_extrafields[static::$_tbname] as $key => $field) {
+            foreach($cot_extrafields[$tableName] as $key => $field) {
                 cot_extrafield_unlinkfiles($this->_data[$column_prefix.$field['field_name']], $field);
             }
         }
@@ -961,7 +992,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
 
         $this->afterDelete();
 
-        $this->_data[static::primaryKey()] = null;
+        $this->_data[$primaryKey] = null;
 
         // Free resources
         if(!empty($this->_extraData)) {
@@ -1016,7 +1047,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      */
     public static function deleteAll($condition = '', $params = array())
     {
-        return static::$_db->delete(static::$_tbname, $condition, $params);
+        return static::$_db->delete(static::tableName(), $condition, $params);
     }
 
     /**
@@ -1076,8 +1107,9 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      *
      * @return array list of field names.
      */
-    public static function fields($real = false, $cache = true) {
-        if ($real) return static::$_db->getFields(static::$_tbname);
+    public static function fields($real = false, $cache = true)
+    {
+        if ($real) return static::$_db->getFields(static::tableName());
 
         $className = get_called_class();
 
@@ -1097,15 +1129,16 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * @param $params
      * @return null
      */
-    public static function field($params) {
+    public static function field($params)
+    {
         $fields = static::fields();
 
         if (is_string($params)) return (!empty($fields[$params])) ? $fields[$params] : null;
         // Если передали объект, надо искать связь
-        if ($params instanceof Som_Model_ActiveRecord) $params = array('model' => get_class($params));
+        if ($params instanceof Model) $params = array('model' => get_class($params));
 
         if (!empty($params['model'])) {
-            if ($params['model'] instanceof Som_Model_ActiveRecord) $params['model'] = get_class($params['model']);
+            if ($params['model'] instanceof Model) $params['model'] = get_class($params['model']);
             foreach ($fields as $fld) {
                 if ($fld['type'] == 'link' && $fld['model'] == $params['model']) {
                     return $fld;
@@ -1125,9 +1158,9 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      *
      * @return null|array
      */
-    public static function getColumns($real = false, $cache = true) {
-
-        if ($real) return static::$_db->getFields(static::$_tbname);
+    public static function getColumns($real = false, $cache = true)
+    {
+        if ($real) return static::$_db->getFields(static::tableName());
 
         $className = get_called_class();
 
@@ -1140,7 +1173,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         $cols[$className] = array();
         foreach ($fields as $name => $field) {
             if (!isset($field['link']) ||
-                (in_array($field['link']['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL)) && !isset($field['link']['localKey']))
+                (in_array($field['link']['relation'], array(\Som::TO_ONE, \Som::TO_ONE_NULL)) && !isset($field['link']['localKey']))
             ) {
                 $cols[$className][] = $name;
             }
@@ -1154,11 +1187,12 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * @param $column
      * @return mixed
      */
-    public function rawValue($column){
+    public function rawValue($column)
+    {
         $fields = static::fields();
 
         if(isset($fields[$column]) && $fields[$column]['type'] == 'link' && in_array($fields[$column]['link']['relation'],
-                array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+                array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
             if(isset($this->_linkData[$column])) return $this->_linkData[$column];
             return null;
 
@@ -1173,7 +1207,8 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * Возвращает список названий полей, обязательных для заполнения
      * @return array
      */
-    public function requiredFields() {
+    public function requiredFields()
+    {
         $requiredFields = array();
         $validators   = $this->validators();
         foreach ($validators as $params) {
@@ -1190,11 +1225,11 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
 
         $fields = static::fields();
         foreach ($fields as $name => $field) {
-            if ($name !== static::$_primary_key) {
+            if ($name !== static::primaryKey()) {
                 if (isset($field['nullable']) && !$field['nullable']) $requiredFields[] = $name;
 
                 if (isset ($field['type']) && ($field['type'] == 'link')
-                    && (in_array($field['link']['relation'], array(Som::TO_MANY, Som::TO_ONE))) ) {
+                    && (in_array($field['link']['relation'], array(\Som::TO_MANY, \Som::TO_ONE))) ) {
                     $requiredFields[] = $name;
                 }
             }
@@ -1208,7 +1243,8 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * @param string $field
      * @return bool
      */
-    public function isRequired($field) {
+    public function isRequired($field)
+    {
         return in_array($field, $this->requiredFields());
     }
 
@@ -1218,33 +1254,33 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * @param string $donor Module which adds a new field. (Так удобднее отчслеживать кто и что добавило поле в модель)
      *      И для кодогенератора это знак, что поле дополнительное
      * @param bool $chekAdded throw Exeption if field already added
-     * @throws Exception
+     * @throws \Exception
      */
-    public static function addFieldToAll($params, $donor, $chekAdded = true ){
-
+    public static function addFieldToAll($params, $donor, $chekAdded = true )
+    {
         if(empty($params)){
-            throw new Exception('Fields params are undefined');
+            throw new \Exception('Fields params are undefined');
         }
 
         if(empty($donor)){
-            throw new Exception('$donor is undefined. Please write here module name which adds a new field.');
+            throw new \Exception('$donor is undefined. Please write here module name which adds a new field.');
         }
 
         if(is_string($params)) $params = array('name' => $params);
 
         if(empty($params['name'])){
-            throw new Exception('Field name is undefined');
+            throw new \Exception('Field name is undefined');
         }
 
         if(array_key_exists($params['name'], static::fieldList())){
-            throw new Exception("Field «{$params['name']}» already exists in model fields list");
+            throw new \Exception("Field «{$params['name']}» already exists in model fields list");
         }
 
         $className = get_called_class();
 
         if($chekAdded && is_array(self::$_extraFields[$className]) && !empty(self::$_extraFields[$className][$params['name']]) &&
                                  array_key_exists($params['name'], self::$_extraFields[$className][$params['name']])){
-            throw new Exception("Field «{$params['name']}» already added to model by «" .
+            throw new \Exception("Field «{$params['name']}» already added to model by «" .
                 static::$_extraFields[$params['name']]['donor'] . "»");
         }
 
@@ -1262,6 +1298,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         if (!empty($field)) {
             if (!empty($this->validators[$field]) && count($this->validators[$field]) > 0) {
                 return $this->validators[$field];
+
             } else {
                 return null;
             }
@@ -1277,7 +1314,8 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * @return $this
      * @todo проверка типов валидаторов
      */
-    public function setValidator($field, $validators) {
+    public function setValidator($field, $validators)
+    {
         if (!is_array($validators)) $validators = array($validators);
 
         foreach ($validators as $val) {
@@ -1298,9 +1336,9 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * @param bool  $clearErrors    whether to call [[clearErrors()]] before performing validation
      *
      * @return bool
-     * @throws Exception
+     * @throws \Exception
      *
-     * @see \Som_Model_Abstract::validate()
+     * @see \Model::validate()
      *
      * @todo дописать метод
      */
@@ -1351,7 +1389,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
             } elseif (isset($fields[$name]) && $fields[$name]['type'] == 'link') {
                 $list = (array)$fields[$name]['link'];
                 // Многие ко многим
-                if (in_array($list['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL)) &&
+                if (in_array($list['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL)) &&
                                                                             !empty($this->_linkData[$name]) ) {
                     $value = $this->_linkData[$name];
                 }
@@ -1359,7 +1397,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
             if (isset($this->validators[$name]) && count($this->validators[$name]) > 0) {
                 foreach ($this->validators[$name] as $validator) {
                     // Проверка на Validator_Abstract
-                    if ($validator instanceof Validator_Abstract) {
+                    if ($validator instanceof \Validator_Abstract) {
                         $validator->setModel($this);
                         $validator->setField($name);
                         if (!$validator->isValid($value)) {
@@ -1373,8 +1411,9 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
                             $res = call_user_func_array($validator, array($value));
                             if ($res !== true) $this->_errors[$name][] = $res;
 
-                        } catch (Exception $e) {
-                            throw new Exception("Wrong CallBack validator for field '{$name}'");
+                        } catch (\Exception $e) {
+                            throw new
+                            \Exception("Wrong CallBack validator for field '{$name}'");
 
                         }
 
@@ -1386,8 +1425,8 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
                                     $fieldName = $name;
                                     $tmp = static::fieldLabel($name);
                                     if(!empty($tmp)) $fieldName = $tmp;
-                                    $error = (isset(cot::$L['field_required_'.$name])) ? cot::$L['field_required_'.$name] :
-                                        cot::$L['field_required'].': '.$fieldName;
+                                    $error = (isset(\cot::$L['field_required_'.$name])) ? \cot::$L['field_required_'.$name] :
+                                        \cot::$L['field_required'].': '.$fieldName;
                                     $this->_errors[$name][] = $error;
                                 }
                                 break;
@@ -1436,7 +1475,8 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * @param bool $errorMessages
      * @return bool
      */
-    public function validateDelete($errorMessages = true) {
+    public function validateDelete($errorMessages = true)
+    {
         $className = get_called_class();
 
         $return = true;
@@ -1454,38 +1494,57 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
 
     /**
      * Get current adapter
-     * @return Som_Model_Mapper_Abstract
+     * @return Adapter
      */
-    public static function adapter() {
+    public static function adapter()
+    {
         return static::$_db;
     }
 
     /**
-     * Adapter Factory
-     * @param string $db connection name
-     * @throws Exception
-     * @return Som_Model_Mapper_Abstract
+     * Get Table Name
+     *
+     * If it is not set this method returns the class name as the table name by calling [[Inflector::tableize()]]
+     * with prefix [[$db_x]]. For example if [[$db_x]] is `cot_`,
+     * `Customer` becomes `cot_customer`, and `OrderItem` becomes `cot_order_item`. You may override this method
+     * if the table is not named after this convention.
+     *
+     * @return string
      */
-    public static function getAdapter($db = 'db') {
-        $className = get_called_class();
+    public static function tableName()
+    {
+        global $db_x;
 
-        if (!empty(static::$_tbname) && isset(static::$_dbtype)) {
-            return Som::getAdapter($db, array(
-                        "class" => get_called_class(),
-                        "tbname" => static::$_tbname,
-                        "pkey" => static::primaryKey(),
-                    ));
-        } else {
-            throw new Exception("Wrong model parameters: $className");
+        if(static::$_tableName === null) {
+            $className = explode('\\', get_called_class());
+            $className = end($className);
+            static::$_tableName = $db_x.Inflector::tableize($className);
         }
+
+        return static::$_tableName;
     }
 
     /**
-     * Get Table Name
+     * Returns primary key column name. Defaults to 'id' if none was set.
+     *
      * @return string
      */
-    public static function tableName(){
-        return static::$_tbname;
+    public static function primaryKey()
+    {
+        if(static::$_primaryKey === null) {
+            $fieldList = static::fieldList();
+            if(!empty($fieldList)) {
+                foreach ($fieldList as $name => $item) {
+                    if(isset($item['primary']) && $item['primary']) {
+                        static::$_primaryKey = isset($item['name']) ? $item['name'] : $name;
+                    }
+                }
+            }
+        }
+
+        if(static::$_primaryKey === null) static::$_primaryKey = 'id';
+
+        return static::$_primaryKey;
     }
 
     /**
@@ -1496,7 +1555,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
     {
         return array(
             "dbtype" => static::$_dbtype,
-            "tbname" => static::$_tbname,
+            "tbname" => static::tableName(),
             "pkey" => static::primaryKey()
         );
     }
@@ -1505,33 +1564,28 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * Get Primary Key
      * @return int
      */
-    public function getId() {
+    public function getId()
+    {
         $pkey = static::primaryKey();
         if (empty($this->_data[$pkey])) return null;
 
         return $this->_data[$pkey];
     }
 
-    /**
-     * Returns primary key column name. Defaults to 'id' if none was set.
-     *
-     * @return string
-     */
-    public static function primaryKey() {
-        return isset(static::$_primary_key) ? static::$_primary_key : 'id';
-    }
-
-    function __toString() {
+    function __toString()
+    {
         return $this->getId();
     }
 
 
-    protected static function compareArrays($arrayA , $arrayB) {
+    protected static function compareArrays($arrayA , $arrayB)
+    {
         $A = array();
         if(!empty($arrayA)) {
             foreach($arrayA as $key => $val) {
-                if($val instanceof Som_Model_ActiveRecord) {
+                if($val instanceof ActiveRecord) {
                     $A[] = $val->getId();
+
                 } else {
                     $A[] = $val;
                 }
@@ -1541,8 +1595,9 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         $B = array();
         if(!empty($arrayB)) {
             foreach($arrayB as $key => $val) {
-                if($val instanceof Som_Model_ActiveRecord) {
+                if($val instanceof ActiveRecord) {
                     $B[] = $val->getId();
+
                 } else {
                     $B[] = $val;
                 }
@@ -1551,6 +1606,7 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
 
         if(count($A) > count($B)){
             $diff = array_diff($A,$B);
+
         } else {
             $diff = array_diff($B,$A);
         }
@@ -1563,5 +1619,5 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
      * Конфиг модели. Информация обо всех полях
      * @return array
      */
-    public static function fieldList() { return array(); }
+    public static function fieldList() { return []; }
 }
