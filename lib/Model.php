@@ -81,15 +81,11 @@ abstract class Model extends Component
         // Инициализация полей
         $fields = static::fields();
         foreach ($fields as $name => $field) {
-            if(isset($field['link'])) {
-                // Не включаем связи указывающие на другое поле
-                if(in_array($field['link']['relation'], [\Som::TO_ONE, \Som::TO_ONE_NULL]) &&
-                    isset($field['link']['localKey'])) {
-                    continue;
-                }
+            if (!isset($field['relation']) ||
+                ($field['relation']['type'] == Db::BELONGS_TO && $field['relation']['localKey'] == $name) ){
+                // Default value
+                $this->_data[$name] = isset($field['default']) ? $field['default'] : null;
             }
-            // Дефолтное значение
-            $this->_data[$name] = isset($field['default']) ? $field['default'] : null;
         }
 
         $this->init($data);
