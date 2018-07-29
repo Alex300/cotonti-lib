@@ -1,17 +1,26 @@
 <?php
 
-namespace Som\Adapter;
+namespace lib\Db\Mysql;
 
-use \Som\Adapter;
+defined('COT_CODE') or die('Wrong URL.');
+
+use lib\Db;
 
 /**
  * MySql Adapter
  * @author Kalnov Alexey http://portal30.ru
  */
-class Mysql extends Adapter
+class Adapter extends \lib\Db\Adapter
 {
+    /**
+     * @var string
+     * @deprecated
+     */
+    //protected $tableQuote = '`';
 
-    protected $tableQuote = '`';
+    protected $dataBaseType = Db::MYSQL;
+    protected $tableQuoteCharacter = '`';
+    protected $columnQuoteCharacter = '`';
 
     /**
      * Connect to Data Base
@@ -27,21 +36,24 @@ class Mysql extends Adapter
                 Adapter::$connections[$dbc] = \cot::$db;
 
             } else {
-                // Альтернативное соединение из конфига
+                // Alternate connection
+                $cfg = Db::connectionSettings($dbc);
+
                 $options = array();
-                if (!empty(\cot::$cfg[$dbc]['charset'])) {
-                    $collation_query = "SET NAMES '".\cot::$cfg[$dbc]['charset']."'";
-                    if (!empty(\cot::$cfg[$dbc]['collate']) )  {
-                        $collation_query .= " COLLATE '".\cot::$cfg[$dbc]['collate']."'";
+
+                if (!empty($cfg['charset'])) {
+                    $collation_query = "SET NAMES '".$cfg['charset']."'";
+                    if (!empty($cfg['collate']) )  {
+                        $collation_query .= " COLLATE '".$cfg['collate']."'";
                     }
                     $options[\PDO::MYSQL_ATTR_INIT_COMMAND] = $collation_query;
                 }
 
-                $dbc_port = empty(\cot::$cfg[$dbc]['port']) ? '' : ';port=' . \cot::$cfg[$dbc]['port'];
-                $dsn = \cot::$cfg[$dbc]['adapter'] . ':host=' . \cot::$cfg[$dbc]['host'] . $dbc_port .
-                    ';dbname=' . \cot::$cfg[$dbc]['dbname'];
-                Adapter::$connections[$dbc] = new \PDO($dsn, \cot::$cfg[$dbc]['username'],
-                    \cot::$cfg[$dbc]['password'], $options);
+                $dbc_port = empty($cfg['port']) ? '' : ';port=' . $cfg['port'];
+
+                $dsn = $cfg['adapter'] . ':host=' . $cfg['host'] . $dbc_port .';dbname=' . $cfg['dbname'];
+
+                \Db\Adapter::$connections[$dbc] = new \PDO($dsn, $cfg['username'], $cfg['password'], $options);
             }
         }
 

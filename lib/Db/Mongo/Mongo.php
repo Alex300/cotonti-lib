@@ -1,6 +1,6 @@
 <?php
 
-namespace Som\Adapter;
+namespace lib\Db\Mongo;
 
 use \Som\Adapter;
 
@@ -9,7 +9,7 @@ use \Som\Adapter;
  *
  * @author Mankov
  */
-class Mongo extends Adapter
+class Adapter extends \lib\Db\Adapter
 {
 
     protected $_adapter = null;

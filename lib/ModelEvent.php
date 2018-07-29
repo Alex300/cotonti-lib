@@ -1,10 +1,11 @@
 <?php
 
-namespace Som;
+namespace lib;
+
 /**
  * ModelEvent represents the parameter needed by [[Model]] events.
  */
-class Event extends \Event
+class ModelEvent extends Event
 {
     /**
      * @var boolean whether the model is in valid status. Defaults to true.

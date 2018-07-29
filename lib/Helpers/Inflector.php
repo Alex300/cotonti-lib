@@ -1,6 +1,8 @@
 <?php
 
-namespace Helpers;
+namespace lib\Helpers;
+
+defined('COT_CODE') or die('Wrong URL.');
 
 /**
  * Inflector pluralizes and singularizes English nouns. It also contains some other useful methods.
@@ -689,8 +691,6 @@ class Inflector
 
             return transliterator_transliterate($transliterator, $string);
         }
-
-
 
         return strtr($string, static::$transliteration);
     }

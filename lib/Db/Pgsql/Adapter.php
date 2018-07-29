@@ -1,16 +1,19 @@
 <?php
 
-namespace Som\Adapter;
+namespace lib\Db\Pgsql;
 
-use \Som\Adapter;
+defined('COT_CODE') or die('Wrong URL.');
 
 /**
  * PostgreSQL Adapter
  * @author Kalnov Alexey http://portal30.ru
  */
-class Pgsql extends Adapter
+class Adapter extends \lib\Db\Adapter
 {
-    protected $tableQuote = '"';
+    //protected $tableQuote = '"';
+
+    protected $dataBaseType = \lib\Db::POSTGRESQL;
+    protected $tableQuoteCharacter = '"';
 
 //    public function getAdapter(){
 //        return Kernel::getDB();

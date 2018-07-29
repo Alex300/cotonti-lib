@@ -1,4 +1,11 @@
 <?php
+
+namespace lib;
+
+defined('COT_CODE') or die('Wrong URL.');
+
+use Exception;
+
 /**
  * Autoloader
  * @author Kalnov Alexey http://portal30.ru
@@ -12,7 +19,7 @@ class Loader
     {
         static $registered = false;
         if(!$registered) {
-            spl_autoload_register(array('Loader', 'autoload'));
+            spl_autoload_register(array('\lib\Loader', 'autoload'));
             $registered = true;
         }
     }
@@ -135,8 +142,8 @@ class Loader
         $incDirs = array();
         if(empty($dirs)) $incDirs = self::explodeIncludePath();
         if(empty($dirs)) $dirs = array();
-        $dirs[] = cot::$cfg['modules_dir'];
-        $dirs[] = cot::$cfg['plugins_dir'];
+        $dirs[] = \cot::$cfg['modules_dir'];
+        $dirs[] = \cot::$cfg['plugins_dir'];
         $dirs[] = dirname(__FILE__); //'lib' directory;
         $dirs = array_merge($dirs, $incDirs);
         if(empty($dirs)) return false;

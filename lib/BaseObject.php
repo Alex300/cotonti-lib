@@ -5,6 +5,13 @@
  * @license http://www.yiiframework.com/license/
  */
 
+namespace lib;
+
+defined('COT_CODE') or die('Wrong URL.');
+
+use \lib\Exception\UnknownPropertyException;
+use \lib\Exception\InvalidCallException;
+use \lib\Exception\UnknownMethodException;
 
 /**
  * Object is the base class that implements the *property* feature.
@@ -124,8 +131,8 @@ class BaseObject
      * will be implicitly called when executing `$value = $object->property;`.
      * @param string $name the property name
      * @return mixed the property value
-     * @throws Exception_UnknownProperty if the property is not defined
-     * @throws Exception_InvalidCall if the property is write-only
+     * @throws UnknownPropertyException if the property is not defined
+     * @throws InvalidCallException if the property is write-only
      * @see __set()
      */
     public function __get($name)
@@ -136,11 +143,11 @@ class BaseObject
             return $this->$getter();
 
         } elseif (method_exists($this, 'set' . ucfirst($name))) {
-            throw new Exception_InvalidCall('Getting write-only property: ' . get_class($this) . '::' . $name);
+            throw new InvalidCallException('Getting write-only property: ' . get_class($this) . '::' . $name);
 
         }
 
-        throw new Exception_UnknownProperty('Getting unknown property: ' . get_class($this) . '::' . $name);
+        throw new UnknownPropertyException('Getting unknown property: ' . get_class($this) . '::' . $name);
     }
 
     /**
@@ -150,8 +157,8 @@ class BaseObject
      * will be implicitly called when executing `$object->property = $value;`.
      * @param string $name the property name or the event name
      * @param mixed $value the property value
-     * @throws Exception_UnknownProperty if the property is not defined
-     * @throws Exception_InvalidCall if the property is read-only
+     * @throws UnknownPropertyException if the property is not defined
+     * @throws InvalidCallException if the property is read-only
      * @see __get()
      */
     public function __set($name, $value)
@@ -163,11 +170,11 @@ class BaseObject
             return;
 
         } elseif (method_exists($this, 'get' . ucfirst($name))) {
-            throw new Exception_InvalidCall('Setting read-only property: ' . get_class($this) . '::' . $name);
+            throw new InvalidCallException('Setting read-only property: ' . get_class($this) . '::' . $name);
 
         }
 
-        throw new Exception_UnknownProperty('Setting unknown property: ' . get_class($this) . '::' . $name);
+        throw new UnknownPropertyException('Setting unknown property: ' . get_class($this) . '::' . $name);
     }
 
     /**
@@ -198,7 +205,7 @@ class BaseObject
      * Note that if the property is not defined, this method will do nothing.
      * If the property is read-only, it will throw an exception.
      * @param string $name the property name
-     * @throws Exception_InvalidCall if the property is read only.
+     * @throws InvalidCallException if the property is read only.
      * @see http://php.net/manual/en/function.unset.php
      */
     public function __unset($name)
@@ -208,7 +215,7 @@ class BaseObject
             $this->$setter(null);
 
         } elseif (method_exists($this, 'get' . ucfirst($name))) {
-            throw new Exception_InvalidCall('Unsetting read-only property: ' . get_class($this) . '::' . $name);
+            throw new InvalidCallException('Unsetting read-only property: ' . get_class($this) . '::' . $name);
         }
     }
 
@@ -219,12 +226,12 @@ class BaseObject
      * will be implicitly called when an unknown method is being invoked.
      * @param string $name the method name
      * @param array $params method parameters
-     * @throws Exception_UnknownMethod when calling unknown method
+     * @throws UnknownMethodException when calling unknown method
      * @return mixed the method return value
      */
     public function __call($name, $params)
     {
-        throw new Exception_UnknownMethod('Calling unknown method: ' . get_class($this) . "::$name()");
+        throw new UnknownMethodException('Calling unknown method: ' . get_class($this) . "::$name()");
     }
 
     /**

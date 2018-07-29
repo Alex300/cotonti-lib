@@ -5,6 +5,10 @@
  * @license http://www.yiiframework.com/license/
  */
 
+namespace lib;
+
+defined('COT_CODE') or die('Wrong URL.');
+
 /**
  * Behavior is the base class for all behavior classes.
  *

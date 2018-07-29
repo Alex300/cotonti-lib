@@ -5,19 +5,22 @@
  * @license http://www.yiiframework.com/license/
  */
 
+namespace lib\Exception;
+
+defined('COT_CODE') or die('Wrong URL.');
+
 /**
- * Exception_UnknownProperty represents an exception caused by accessing unknown object properties.
+ * UnknownMethodException represents an exception caused by accessing an unknown object method.
  *
  * @author Qiang Xue <qiang.xue@gmail.com>
- * @since 2.0
  */
-class Exception_UnknownProperty extends Exception
+class UnknownMethodException extends \BadMethodCallException
 {
     /**
      * @return string the user-friendly name of this exception
      */
     public function getName()
     {
-        return 'Unknown Property';
+        return 'Unknown Method';
     }
 }

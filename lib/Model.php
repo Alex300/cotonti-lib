@@ -1,6 +1,12 @@
 <?php
 
-namespace Som;
+namespace lib;
+
+defined('COT_CODE') or die('Wrong URL.');
+
+use lib\Component;
+use lib\ModelEvent;
+use lib\Exception\InvalidCallException;
 
 /**
  * Model is the base class for data models.
@@ -22,7 +28,7 @@ namespace Som;
  *
  * @author  Kalnov Alexey <kalnov_alexey@yandex.ru> http://portal30.ru
  */
-abstract class Model extends \Component
+abstract class Model extends Component
 {
 
     /**
@@ -91,7 +97,7 @@ abstract class Model extends \Component
         // Заполняем существующие поля строго переданными значениями. Никаких сеттеров
         if (!is_null($data)) {
             foreach ($data as $key => $value) {
-                if (in_array($key, static::getColumns())) {
+                if (in_array($key, static::columns())) {
                     $this->_data[$key] = $value;
 
                 } elseif (!isset($fields[$key])) {
@@ -122,8 +128,6 @@ abstract class Model extends \Component
      * will be implicitly called when executing `$value = $component->property;`.
      * @param string $name the property name
      * @return mixed the property value or the value of a behavior's property
-     * @throws \Exception_UnknownProperty if the property is not defined
-     * @throws \Exception_InvalidCall if the property is write-only.
      * @see __set()
      */
     public function __get($name)
@@ -194,7 +198,7 @@ abstract class Model extends \Component
             }
         }
 
-        if (in_array($name, static::getColumns())) {
+        if (in_array($name, static::columns())) {
             $this->_data[$name] = $value;
             return;
         }
@@ -240,7 +244,7 @@ abstract class Model extends \Component
      * Do not call this method directly as it is a PHP magic method that
      * will be implicitly called when executing `unset($component->property)`.
      * @param string $name the property name
-     * @throws \Exception_InvalidCall if the property is read only.
+     * @throws InvalidCallException if the property is read only.
      * @see http://php.net/manual/en/function.unset.php
      */
     public function __unset($name)
@@ -275,7 +279,7 @@ abstract class Model extends \Component
             return;
         }
 
-        throw new \Exception_InvalidCall('Unsetting an unknown or read-only property: ' . get_class($this) . '::' . $name);
+        throw new InvalidCallException('Unsetting an unknown or read-only property: ' . get_class($this) . '::' . $name);
     }
 
     protected function beforeSetData(&$data)
@@ -289,7 +293,7 @@ abstract class Model extends \Component
         }
         /* ===== */
 
-        $event = new Event;
+        $event = new ModelEvent;
         $event->data['data'] = $data;
 
         $this->trigger(self::EVENT_BEFORE_SET_DATA, $event);
@@ -299,10 +303,23 @@ abstract class Model extends \Component
 
     /**
      * Converts the model into an array.
+     * Can be used to send data for example to front end via JSON
      *
      * @return array
      */
     function toArray()
+    {
+        $data = $this->_data;
+        return $data;
+    }
+
+    /**
+     * Converts the model into a raw array.
+     * Can be user for insert/update operations
+     *
+     * @return array
+     */
+    function toRawArray()
     {
         $data = $this->_data;
         return $data;
@@ -483,7 +500,7 @@ abstract class Model extends \Component
      *
      * @return null|array
      */
-    public static function getColumns($cache = true)
+    public static function columns($cache = true)
     {
         $className = get_called_class();
 
@@ -643,7 +660,7 @@ abstract class Model extends \Component
         }
         /* ===== */
 
-        $event = new Event;
+        $event = new ModelEvent;
         $event->data['validateFields'] = $validateFields;
         $this->trigger(self::EVENT_BEFORE_VALIDATE, $event);
 
@@ -701,7 +718,7 @@ abstract class Model extends \Component
 
         if (empty($validateFields)) {
             // Получить все поля модели
-            $validateFields = static::getColumns();
+            $validateFields = static::columns();
             foreach ($fields as $name => $fld) {
                 if (!in_array($name, $validateFields)) $validateFields[] = $name;
             }
@@ -821,7 +838,7 @@ abstract class Model extends \Component
         }
         /* ===== */
 
-        $event = new Event;
+        $event = new ModelEvent;
         $event->data['validateFields'] = $validateFields;
         $this->trigger(self::EVENT_AFTER_VALIDATE, $event);
     }
@@ -834,6 +851,6 @@ abstract class Model extends \Component
      */
     public static function fieldList()
     {
-        return array();
+        return [];
     }
 }

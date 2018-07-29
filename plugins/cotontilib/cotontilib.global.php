@@ -11,12 +11,14 @@ Order=4
  * @package Cotonti Lib
  * @author  Kalnov Alexey    <kalnovalexey@yandex.ru>
  * @copyright © Portal30 Studio http://portal30.ru
+ *
+ * Todo set \lib\Helpers\Inflector::$transliterator default value $cot_transliterator
  */
 defined('COT_CODE') or die('Wrong URL.');
 
 // Autoloader
 require_once 'lib/Loader.php';
-Loader::register();
+\lib\Loader::register();
 
 include cot_langfile('cotontilib', 'plug');
 
@@ -64,7 +66,7 @@ if(!function_exists('mb_lcfirst')) {
  * @return string
  *
  * Todo check if russian settings are right
- * Todo use \Helpers\Inflector::transliterate()
+ * Todo use \lib\Helpers\Inflector::transliterate()
  */
 function cot_transliterate($string, $transliterator = null)
 {

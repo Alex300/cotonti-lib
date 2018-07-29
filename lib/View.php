@@ -1,4 +1,9 @@
 <?php
+
+namespace lib;
+
+defined('COT_CODE') or die('Wrong URL.');
+
 /**
  * View Class
  * @author Kalnov Alexey http://portal30.ru

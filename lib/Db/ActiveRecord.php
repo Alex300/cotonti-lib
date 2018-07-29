@@ -1,8 +1,16 @@
 <?php
 
-namespace Som;
+namespace lib\Db;
 
-use \Helpers\Inflector;
+defined('COT_CODE') or die('Wrong URL.');
+
+use lib\Db;
+use lib\Db\Adapter;
+use lib\Model;
+use lib\ModelEvent;
+use lib\Helpers\Inflector;
+use lib\Exception\InvalidArgumentException;
+use lib\Exception\InvalidCallException;
 
 /**
  * ORM System
@@ -15,6 +23,7 @@ use \Helpers\Inflector;
  * @author Mankov
  * @author Kalnov Alexey <kalnov_alexey@yandex.ru> http://portal30.ru
  *
+ * @todo update setters, getters etc.
  */
 abstract class ActiveRecord extends Model
 {
@@ -47,15 +56,32 @@ abstract class ActiveRecord extends Model
     const EVENT_AFTER_DELETE  = 'afterDelete';
 
     /**
+     * The name of the "created at" column.
+     * @var string
+     */
+    const CREATED_AT = 'created_at';
+
+    /**
+     * The name of the "updated at" column.
+     * @var string
+     */
+    const UPDATED_AT = 'updated_at';
+
+    /**
      * @var string
      */
     protected static $_dbtype;
 
-    protected static $_stCache = array();
+    protected static $_stCache = [];
+
+    /**
+     * @var array related models indexed by the relation names
+     */
+    protected $_relations = [];
 
     /**
      * Данные связей
-     * @var array
+     * @deprecated use $_relations instead
      */
     protected $_linkData = array();
 
@@ -64,14 +90,14 @@ abstract class ActiveRecord extends Model
      * изменилось ли поле.
      * @var array
      */
-    protected $_oldData = array();
+    protected $_oldData = [];
 
     /**
      * Model extrafields. Поля присутсвующие в таблице, но не описанные в fieldList().
      * Они могут быть созданы другими модулями
      * @var array
      */
-    protected static $_extraFields = array();
+    protected static $_extraFields = [];
 
     /**
      * Static constructor
@@ -79,25 +105,9 @@ abstract class ActiveRecord extends Model
      * Модель не проверяет наличие таблицы и всех полей, а наивно доверяет данным из метода fieldList()
      * @throws \Exception
      */
-    public static function __init($db = 'db')
+    public static function __init($dbc = 'db')
     {
-        if($db == 'db') {
-            static::$_dbtype = 'mysql';
-
-        } else {
-            if(empty(\cot::$cfg[$db]) || empty(\cot::$cfg[$db]['adapter'])) {
-                throw new \Exception('Connection config not found in $cfg['.$db.']');
-            }
-
-            static::$_dbtype = \cot::$cfg[$db]['adapter'];
-        }
-
-        // Todo не нужно передавать этот массив с параметрами
-        static::$_db = $dbAdapter = \Som::getAdapter($db, [
-            "class"  => get_called_class(),
-            "tbname" => static::tableName(),
-            "pkey"   => static::primaryKey(),
-        ]);
+        static::$_db = $dbAdapter = Db::adapter($dbc);
 
         $className = get_called_class();
         self::$_extraFields[$className] = array();
@@ -143,9 +153,9 @@ abstract class ActiveRecord extends Model
         // Инициализация полей
         $fields = static::fields();
         foreach ($fields as $name => $field) {
-            if (!isset($field['link']) ||
-                (in_array($field['link']['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL)) && !isset($field['link']['localKey'])) ){
-                // Дефолтное значение
+            if (!isset($field['relation']) ||
+                ($field['relation']['type'] == Db::BELONGS_TO && $field['relation']['localKey'] == $name) ){
+                // Default value
                 $this->_data[$name] = isset($field['default']) ? $field['default'] : null;
             }
         }
@@ -155,7 +165,7 @@ abstract class ActiveRecord extends Model
         // Заполняем существующие поля строго значениями из БД. Никаких сеттеров
         if (!is_null($data)) {
             foreach ($data as $key => $value) {
-                if (in_array($key, static::getColumns())) {
+                if (in_array($key, static::columns())) {
                     $this->_data[$key] = $value;
 
                 } elseif(!isset($fields[$key])) {
@@ -166,22 +176,24 @@ abstract class ActiveRecord extends Model
         }
 
         // Для существующих объектов грузим Многие ко многим (только id)
-        if (is_array($data) && isset($data[$pkey]) && $data[$pkey] > 0 && !empty($fields)) {
-            foreach ($fields as $key => $field) {
-                if (isset($field['link']) && in_array($field['link']['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
-                    $this->_linkData[$key] = static::$_db->loadXRef($field['link']["model"], $data[$pkey], $key);
-                }
-            }
-        }
+//        if (is_array($data) && isset($data[$pkey]) && $data[$pkey] > 0 && !empty($fields)) {
+//            foreach ($fields as $key => $field) {
+//                if (isset($field['link']) && in_array($field['link']['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
+//                    $this->_linkData[$key] = static::$_db->loadXRef($field['link']["model"], $data[$pkey], $key);
+//                }
+//            }
+//        }
     }
 
     // ==== Методы для манипуляции с данными ====
+
     /**
      * PHP getter magic method.
      * This method is overridden so that attributes and related objects can be accessed like properties.
      *
      * @param string $name The property name
-     * @return null|mixed|Model
+     * @return null|mixed|Model|Model[]
+     * @throws \Exception
      */
     public function __get($name)
     {
@@ -200,33 +212,13 @@ abstract class ActiveRecord extends Model
 
         $fields = static::fields();
 
-        // Проверка на наличие связей
-        if (isset($fields[$name]) && $fields[$name]['type'] == 'link') {
-            $list = (array)$fields[$name]['link'];
+        // Check if it is a relation.
+        if (isset($fields[$name]) && (isset($fields[$name]['relation']))) {
+            if(!array_key_exists($name, $this->_relations)) return $this->loadRelation($name);
 
-            /** @var ActiveRecord $modelName */
-            $modelName = $list['model'];
-            $localkey = !empty($list['localKey']) ? $list['localKey'] : $name;
+            if($this->_relations[$name] === null || $this->_relations[$name] === false) return null;
 
-            // Один ко многим
-            if (in_array($list['relation'], array(\Som::TO_ONE, \Som::TO_ONE_NULL))) {
-                if (empty($this->_data[$localkey])) return null;
-
-                return $modelName::getById($this->_data[$localkey]);
-            }
-
-            // Многие ко многим
-            if (in_array($list['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
-                if (!empty($this->_linkData[$name]) && is_array($this->_linkData[$name]) && count($this->_linkData[$name]) > 0) {
-                    // ХЗ как лучше, find или в цикле getById (getById кешируется на время выполенния, но за раз много запрсов)
-                    return $modelName::findByCondition(array(
-                        array( $modelName::primaryKey(), $this->_linkData[$name] )
-                    ), 0, 0, array($modelName::primaryKey()));
-
-                } else {
-                    return null;
-                }
-            }
+            return $this->_relations[$name];
         }
 
         if (isset($this->_data[$name]))       return $this->_data[$name];
@@ -247,35 +239,84 @@ abstract class ActiveRecord extends Model
     {
         $fields = static::fields();
 
-        $link = false;
-        // Проверка связей
-        if (isset($fields[$name]) && $fields[$name]['type'] == 'link') {
-            $link = (array)$fields[$name]['link'];
-            $localkey = (!empty($link['localKey'])) ? $link['localKey'] : $name;
-            $className = $link['model'];
+        $relation = null;
+        $relatedModel = null;
+        $localKey = null;
+        $valueToSet = null;
+
+        // Check relations
+        $tmp = $this->relation($name);
+        if ($tmp) {
+            $relation = $tmp['relation'];
+            /** @var Model $relatedModel */
+            $relatedModel = $relation['model'];
+
+            $tmp = $value;
+            if(!is_array($tmp)) $tmp = [$tmp];
+            foreach ($tmp as $tmpRow) {
+                // Type checking
+                // For Belongs to id can be passed
+                if($relation['type'] == DB::BELONGS_TO && !is_object($tmpRow)) {
+                    continue;
+                }
+
+                if(!($tmpRow instanceof $relatedModel)) {
+                    throw new InvalidArgumentException('The type of the passed value does not match the field type. It should be:"'.
+                        $relatedModel.'"');
+                }
+            }
+            unset($tmp);
         }
 
         // Set old data
         if(isset($fields[$name]) && !isset($this->_oldData[$name])) {
-            if($link) {
-                if (in_array($link['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
-                    $newData = $value;
-                    $oldData = (isset($this->_linkData[$name])) ? $this->_linkData[$name] : null;
-                    if(!is_array($newData)) $newData = array($newData);
-                    if(!is_array($oldData)) $oldData = array($oldData);
-                    if(!static::compareArrays($oldData, $newData)) $this->_oldData[$name] = $oldData;
+            if($relation) {
+                $newData = $value;
+                $oldData = (isset($this->_relations[$name])) ? $this->_relations[$name] : null;
+                if(!is_array($newData)) $newData = array($newData);
+                if(!is_array($oldData)) $oldData = array($oldData);
+                if(!static::compareArrays($oldData, $newData)) $this->_oldData[$name] = $oldData;
 
-                } elseif(in_array($link['relation'], array(\Som::TO_ONE, \Som::TO_ONE_NULL))) {
-                    if ($value instanceof Model) {
-                        if($this->_data[$localkey] != $value->getId()) {
-                            $this->_oldData[$name] = $this->_data[$localkey];
+                if($relation['type'] == DB::BELONGS_TO) {
+                    $localKey = !empty($relation['localKey']) ? $relation['localKey'] : null;
+                    if(empty($localKey) && method_exists($relatedModel, 'foreignKey')) {
+                        $localKey = $relatedModel::foreignKey();
+                    }
+
+                    if(!empty($localKey)) {
+                        $tmp = static::columns();
+                        if(!in_array($localKey, $tmp)) {
+                            throw new \Exception('Local key "'.$localKey.'" not found in "'.get_class($this).'"');
                         }
-                    } else {
-                        if($this->_data[$localkey] != $value) {
-                            $this->_oldData[$name] = $this->_data[$localkey];
+                        $valueToSet = $value;
+                        if ($value instanceof $relatedModel) {
+                            $valueToSet = $value->getId();
                         }
+                        if($this->_data[$localKey] != $valueToSet) {
+                            $this->_oldData[$localKey] = $this->_data[$localKey];
+                        }
+
                     }
                 }
+
+//                if ($relation['type'] == Db::MANY_TO_MANY) {
+//                    $newData = $value;
+//                    $oldData = (isset($this->_relations[$name])) ? $this->_relations[$name] : null;
+//                    if(!is_array($newData)) $newData = array($newData);
+//                    if(!is_array($oldData)) $oldData = array($oldData);
+//                    if(!static::compareArrays($oldData, $newData)) $this->_oldData[$name] = $oldData;
+//
+//                } elseif(in_array($link['relation'], array(\Som::TO_ONE, \Som::TO_ONE_NULL))) {
+//                    if ($value instanceof Model) {
+//                        if($this->_data[$localkey] != $value->getId()) {
+//                            $this->_oldData[$name] = $this->_data[$localkey];
+//                        }
+//                    } else {
+//                        if($this->_data[$localkey] != $value) {
+//                            $this->_oldData[$name] = $this->_data[$localkey];
+//                        }
+//                    }
+//                }
 
             } elseif(in_array($fields[$name]['type'], array('datetime', 'date', 'timestamp')) ){
                 if(strtotime($this->_data[$name]) != strtotime($value)){
@@ -316,49 +357,49 @@ abstract class ActiveRecord extends Model
             }
         }
 
-        // если передали объект, Один ко многим
+        // If if is any type of Models
         if ($value instanceof Model) {
-            // Проверка типа
-            if ($link) {
-                if ($value instanceof $className) {
-                    $value = $value->getId();
-
-                } else {
-                    throw new \Exception("Тип переданного значения не соответствует пипу поля. Должно быть: $className");
-                }
-
-            } elseif (in_array($name, static::getColumns())) {
-                throw new \Exception("Связь для поля '{$name}' не найдена");
+            // Check $value type
+            if(!$relation) {
+                throw new InvalidArgumentException(get_class($this) . ' has no relation named "' .$name . '".');
             }
         }
 
 
         // Если это связь
-        if ($link) {
+        if ($relation) {
             // Один ко многим
-            if (in_array($link['relation'], array(\Som::TO_ONE, \Som::TO_ONE_NULL))) {
-                $this->_data[$localkey] = $value;
-                return;
-            }
-            if (in_array($link['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
-                if (!is_array($value)) $value = array($value);
-                $this->_linkData[$name] = array();
-                foreach ($value as $valRow) {
-                    // todo проверка типов
-                    if ($valRow instanceof $className) {
-                        $this->_linkData[$name][] = $valRow->getId();
+            if($relation['type'] == DB::BELONGS_TO) {
+                $localKey = !empty($relation['localKey']) ? $relation['localKey'] : null;
+                if(empty($localKey) && method_exists($relatedModel, 'foreignKey')) {
+                    $localKey = $relatedModel::foreignKey();
+                }
 
-                    } elseif ($valRow) {
-                        $this->_linkData[$name][] = $valRow;
+                if(!empty($localKey)) {
+                    $this->_data[$localKey] = $valueToSet;
+                }
+                if ($value instanceof $relatedModel) {
+                    $this->_relations[$name] = $value;
+                }
+
+            } else {
+                $valueToSet = $value;
+                if (in_array($relation['type'], [Db::HAS_MANY, Db::MANY_TO_MANY])) {
+                    if (!is_array($valueToSet)) {
+                        $valueToSet = [$value];
                     }
                 }
+                $this->_relations[$name] = $valueToSet;
             }
+
+            //return;
         }
 
-        // input filter
-        if (in_array($name, static::getColumns())) {
+        // Input filter
+        if (in_array($name, static::columns())) {
             // @todo общие типы данных, независимые от типа БД
-            switch ($fields[$name]['type']) {
+            $type = strtolower($fields[$name]['type']);
+            switch ($type) {
                 case 'tinyint':
                 case 'smallint':
                 case 'mediumint':
@@ -383,10 +424,30 @@ abstract class ActiveRecord extends Model
                 case 'text':
                     $value = cot_import($value, 'DIRECT', 'HTM');
                     break;
+
+                case 'datetime':
+                case 'date':
+                case 'timestamp':
+                    if(is_numeric($value) && ($f = (float)$value) == (int)$f ) {
+                        $value = (int)$value;
+
+                    } else {
+                        $value = strtotime($value);
+                    }
+
+                    if(!empty($value)) {
+                        $value = ($type == 'date') ? date('Y-m-d', $value) : date('Y-m-d H:i:s', $value);
+
+                    } else {
+                        $value = null;
+                    }
+                    break;
+
             }
+
             $this->_data[$name] = $value;
 
-        } elseif (!$link) {
+        } elseif (!$relation) {
             $this->_extraData[$name] = $value;
         }
     }
@@ -409,24 +470,6 @@ abstract class ActiveRecord extends Model
         foreach ($this->_behaviors as $behavior) {
             if ($behavior->canGetProperty($name)) {
                 return $behavior->$name !== null;
-            }
-        }
-
-        $fields = static::fields();
-
-        // Проверка на наличие связей
-        if (isset($fields[$name]) && $fields[$name]['type'] == 'link') {
-            $list = (array)$fields[$name]['link'];
-
-            $localkey = !empty($list['localKey']) ? $list['localKey'] : $name;
-            // Один ко многим
-            if (in_array($list['relation'], array(\Som::TO_ONE, \Som::TO_ONE_NULL))) {
-                return !empty($this->_data[$localkey]);
-            }
-
-            // Многие ко многим
-            if (in_array($list['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
-                return !empty($this->_linkData[$name]);
             }
         }
 
@@ -474,25 +517,29 @@ abstract class ActiveRecord extends Model
         $fields = static::fields();
 
         // Проверка на наличие связей
-        if (isset($fields[$name]) && $fields[$name]['type'] == 'link') {
-            $list = (array)$fields[$name]['link'];
+        $tmp = $this->relation($name);
+        if ($tmp) {
+            $relation = $tmp['relation'];
 
-            $localkey = !empty($list['localKey']) ? $list['localKey'] : $name;
-            // Один ко многим
-            if (in_array($list['relation'], array(\Som::TO_ONE, \Som::TO_ONE_NULL))) {
-                unset($this->_data[$localkey]);
+            if($relation['type'] == DB::BELONGS_TO) {
+                /** @var Model $relatedModel */
+                $relatedModel = $relation['model'];
+                $localKey = !empty($relation['localKey']) ? $relation['localKey'] : null;
+                if(empty($localKey) && method_exists($relatedModel, 'foreignKey')) {
+                    $localKey = $relatedModel::foreignKey();
+                }
+
+                if(!empty($localKey)) unset($this->_data[$localKey]);
             }
 
-            // Многие ко многим
-            if (in_array($list['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
-                unset($this->_linkData[$name]);
-            }
+            unset($this->_relations[$name]);
         }
 
         if (isset($this->_data[$name])) {
             unset($this->_data[$name]);
             return;
         }
+
         if (isset($this->_extraData[$name])) {
             unset($this->_extraData[$name]);
             return;
@@ -528,11 +575,11 @@ abstract class ActiveRecord extends Model
         }
 
         $class = get_class($this);
-        if ($data instanceof $class)
-            $data = $data->toArray();
+        if ($data instanceof $class) $data = $data->toRawArray();
         if (!is_array($data)) {
-            throw new  \Exception("Data must be an Array or instance of $class Class");
+            throw new  InvalidArgumentException("Data must be an Array or instance of $class Class");
         }
+
         foreach ($data as $key => $value) {
             if ($safe && isset($fields[$key]['safe']) && $fields[$key]['safe']) {
                 if(!\cot::$usr['isadmin'] && \cot::$env['ext'] != 'admin'){
@@ -574,7 +621,7 @@ abstract class ActiveRecord extends Model
                 $this->_data[$field] = $this->_data[$field] + $val;
             }
             $pkey = static::primaryKey();
-            return static::$_db->inc(static::tableName(), $pair, " {$pkey} = {$this->getId()} " .$conditions);
+            return static::adapter()->inc(static::tableName(), $pair, " {$pkey} = {$this->getId()} " .$conditions);
         }
     }
 
@@ -620,6 +667,209 @@ abstract class ActiveRecord extends Model
     // ==== /Методы для манипуляции с данными ====
 
 
+    // ==== Methods for working with relationships ====
+    /**
+     * Get the default foreign key name for the model.
+     *
+     * @return string
+     */
+    public static function foreignKey()
+    {
+        $prefix = static::adapter()->getTablePrefix();
+
+        $table = preg_replace("/^$prefix/iu", '', static::tableName());
+        return mb_strtolower(Inflector::singularize($table) . '_' . static::primaryKey());
+    }
+
+    /**
+     * Get relation config by relation name
+     * @param $relation
+     * @return array|null field with relation settings
+     */
+    public function relation($relation)
+    {
+        $field = static::field($relation);
+        if(!empty($field) && !empty($field['relation'])) {
+            $field['name'] = $relation;
+            return $field;
+        }
+
+        return null;
+    }
+
+    /**
+     * Get a specified relationship.
+     *
+     * @param string $relation
+     * @return ActiveRecord|ActiveRecord[]|null
+     * @throws \Exception
+     */
+    public function loadRelation($relation)
+    {
+        $class = get_called_class();
+
+        $field = static::relation($relation);
+        if(empty($field)) {
+            throw new InvalidArgumentException(get_class($this) . ' has no relation named "' .
+                $relation . '".');
+        }
+
+        // Load relation
+        $params = $field['relation'];
+        /** @var ActiveRecord $relatedModel */
+        $relatedModel = $field['relation']['model'];
+
+        // It doesn't make a sense for new instances
+        if($this->getId() == 0 && in_array($params['type'], [DB::HAS_ONE, DB::HAS_MANY, DB::MANY_TO_MANY])) {
+            return null;
+        }
+
+        $this->_relations[$relation] = null;
+
+        switch($params['type']) {
+            /**
+             * A one-to-one relationship.
+             * @see DB::HAS_ONE
+             */
+            case DB::HAS_ONE:
+                $foreignKey = !empty($params['foreignKey']) ? $params['foreignKey'] : static::foreignKey();
+
+                $this->_relations[$relation] = $relatedModel::fetchOne([[$foreignKey, $this->getId()]]);
+                break;
+
+            /**
+             * A one-to-many relationship.
+             * @see DB::HAS_MANY
+             */
+            case DB::HAS_MANY:
+                $foreignKey = !empty($params['foreignKey']) ? $params['foreignKey'] : static::foreignKey();
+
+                $this->_relations[$relation] = $relatedModel::findByCondition([[$foreignKey, $this->getId()]]);
+                break;
+
+            /**
+             * Inverse for HAS_ONE и HAS_MANY
+             * @see DB::BELONGS_TO
+             */
+            case DB::BELONGS_TO:
+                $localKey = !empty($params['localKey']) ? $params['localKey'] : $relatedModel::foreignKey();
+
+                if(empty($this->_data[$localKey])) $this->_relations[$relation] = null;
+
+                $this->_relations[$relation] =  $relatedModel::getById($this->_data[$localKey]);
+                break;
+
+            /**
+             * A many-to-many relationship.
+             * @see DB::MANY_TO_MANY
+             */
+            case DB::MANY_TO_MANY:
+                $tmp = static::adapter()->junctionTable(static::tableName(), $relatedModel::tableName(),
+                    static::primaryKey(), $relatedModel::primaryKey());
+
+                $junctionTable = !empty($params['table']) ? $params['table'] : $tmp['name'];
+
+                // Foreign key name of the model on which you are defining the relationship
+                $localKey = !empty($params['localKey']) ? $params['localKey'] : static::foreignKey();
+
+                // Foreign key name of the model that you are joining to
+                $foreignKey = !empty($params['foreignKey']) ? $params['foreignKey'] : $relatedModel::foreignKey();
+
+                $field = !empty($params['field']) ? $params['foreignKey'] : '';
+
+                $result = null;
+                try {
+                    $result = $relatedModel::find()
+                        ->join($junctionTable, $junctionTable . '.' . $foreignKey, '=',
+                            $relatedModel::tableName() . '.' . $relatedModel::primaryKey())
+                        ->where($junctionTable . '.' . $localKey, '=', static::primaryKey())
+                        ->where($junctionTable . '.field', '=', $field)
+                        ->all();
+                } catch (\PDOException $e) {
+                    // It seems that junction table is not exist. So there are no related models
+                }
+
+                $this->_relations[$relation] = $result;
+
+                break;
+
+            default:
+                throw new \Exception("Unknown relation type '{$params['type']}' in {$class}");
+        }
+
+        return $this->_relations[$relation];
+    }
+
+    /**
+     * @todo implement it
+     *
+     * Establishes the relationship between two models.
+     *
+     * The relationship is established by setting the foreign key value(s) in one model
+     * to be the corresponding primary key value(s) in the other model.
+     * The model with the foreign key will be saved into database without performing validation.
+     *
+     * If the relationship involves a junction table, a new row will be inserted into the
+     * junction table which contains the primary key values from both models.
+     *
+     * Note that this method requires that the primary key value is not null.
+     *
+     * @param string $name the case sensitive name of the relationship, e.g. `orders` for a relation defined via `getOrders()` method.
+     * @param ActiveRecord $model the model to be linked with the current one.
+     * @param array $extraColumns additional column values to be saved into the junction table.
+     * This parameter is only meaningful for a relationship involving a junction table
+     * (i.e., a relation set with [[ActiveRelationTrait::via()]] or [[ActiveQuery::viaTable()]].)
+     * @throws InvalidCallException if the method is unable to link two models.
+     *
+     * @todo unset($this->relations($name)); чтобы обновить список зависимых моделей при следующем обращении
+     */
+    public function link($name, $model, $extraColumns = [])
+    {
+
+    }
+
+    /**
+     * Destroys the relationship between two models.
+     *
+     * The model with the foreign key of the relationship will be deleted if `$delete` is `true`.
+     * Otherwise, the foreign key will be set `null` and the model will be saved without validation.
+     *
+     * @param string $name the case sensitive name of the relationship, e.g. `orders` for a relation defined via `getOrders()` method.
+     * @param ActiveRecord $model the model to be unlinked from the current one.
+     * You have to make sure that the model is really related with the current model as this method
+     * does not check this.
+     * @param bool $delete whether to delete the model that contains the foreign key.
+     * If `false`, the model's foreign key will be set `null` and saved.
+     * If `true`, the model containing the foreign key will be deleted.
+     * @throws InvalidCallException if the models cannot be unlinked
+     */
+    public function unlink($name, $model, $delete = false)
+    {
+
+    }
+
+    /**
+     * Destroys the relationship in current model.
+     *
+     * The model with the foreign key of the relationship will be deleted if `$delete` is `true`.
+     * Otherwise, the foreign key will be set `null` and the model will be saved without validation.
+     *
+     * Note that to destroy the relationship without removing records make sure your keys can be set to null
+     *
+     * @param string $name the case sensitive name of the relationship, e.g. `orders` for a relation defined via `getOrders()` method.
+     * @param bool $delete whether to delete the model that contains the foreign key.
+     *
+     * Note that the deletion will be performed using [[deleteAll()]], which will not trigger any events on the related models.
+     * If you need [[EVENT_BEFORE_DELETE]] or [[EVENT_AFTER_DELETE]] to be triggered, you need to [[find()|find]] the models first
+     * and then call [[delete()]] on each of them.
+     */
+    public function unlinkAll($name, $delete = false)
+    {
+
+    }
+    // ==== /Methods for working with relationships ====
+
+
     // ==== Методы для чтения и записи в БД ====
     /**
      * Retrieve existing object from database by primary key
@@ -628,6 +878,7 @@ abstract class ActiveRecord extends Model
      * @param bool $staticCache Использовать кеш выборки?
      *
      * @return ActiveRecord
+     * @throws \ReflectionException
      */
     public static function getById($pk, $staticCache = true)
     {
@@ -681,23 +932,14 @@ abstract class ActiveRecord extends Model
     }
 
     /**
-     * Retrieve all existing objects from database
+     * Get Query object
      *
-     * @param mixed $conditions Numeric array of SQL WHERE conditions or a single
-     *                           condition as a string
-     * @param int $limit Maximum number of returned objects
-     * @param int $offset Offset from where to begin returning objects
-     * @param string $order Column name to order on
-     *
-     * @return ActiveRecord[]
-     *
-     * @deprecated. Use Som_Model_ActiveRecord::findByCondition() instead
-     *
-     * This method will return a Query Object in future releases
+     * @return ActiveQuery
+     * @throws \Exception
      */
-    public static function find($conditions = array(), $limit = 0, $offset = 0, $order = '')
+    public static function find()
     {
-        return static::findByCondition($conditions, $limit, $offset, $order);
+        return new ActiveQuery(get_called_class());
     }
 
     /**
@@ -746,9 +988,12 @@ abstract class ActiveRecord extends Model
      * @param string $order Column name to order on
      *
      * @return ActiveRecord[]
+     * @throws \ReflectionException
      */
-    protected static function fetch($conditions = array(), $limit = 0, $offset = 0, $order = '') {
-        return static::$_db->fetch($conditions, $limit, $offset, $order);
+    protected static function fetch($conditions = [], $limit = 0, $offset = 0, $order = '')
+    {
+        $className = get_called_class();
+        return static::adapter()->fetch($className, $conditions, $limit, $offset, $order);
     }
 
     protected function beforeSave(&$data = null)
@@ -762,7 +1007,7 @@ abstract class ActiveRecord extends Model
         }
         /* ===== */
 
-        $event = new Event;
+        $event = new ModelEvent;
         $event->data['data'] = $data;
         $this->trigger(self::EVENT_BEFORE_SAVE, $event);
 
@@ -827,11 +1072,17 @@ abstract class ActiveRecord extends Model
         $className = get_called_class();
         $fields = static::fields();
 
+        $now = date('Y-m-d H:i:s', \cot::$sys['now']);
+
         // Fill magic fields
-        if(array_key_exists('created',    $fields)) $this->_data['created']    = date('Y-m-d H:i:s', cot::$sys['now']);
-        if(array_key_exists('created_by', $fields)) $this->_data['created_by'] = cot::$usr['id'];
-        if(array_key_exists('updated',    $fields)) $this->_data['updated']    = date('Y-m-d H:i:s', cot::$sys['now']);
-        if(array_key_exists('updated_by', $fields)) $this->_data['updated_by'] = cot::$usr['id'];
+        if(array_key_exists(static::CREATED_AT, $fields)) {
+            $this->_data[static::CREATED_AT] = $now;
+        }
+        if(array_key_exists('created_by', $fields)) $this->_data['created_by'] = \cot::$usr['id'];
+        if(array_key_exists(static::UPDATED_AT, $fields)) {
+            $this->_data[static::UPDATED_AT] = $now;
+        }
+        if(array_key_exists('updated_by', $fields)) $this->_data['updated_by'] = \cot::$usr['id'];
 
         $return = true;
 
@@ -841,7 +1092,7 @@ abstract class ActiveRecord extends Model
         }
         /* ===== */
 
-        $event = new Event;
+        $event = new ModelEvent;
         $this->trigger(self::EVENT_BEFORE_INSERT, $event);
 
         return $return && $event->isValid;
@@ -850,6 +1101,7 @@ abstract class ActiveRecord extends Model
     /**
      * Create object
      * @return int created object id
+     * @throws \Exception
      */
     protected final function insert()
     {
@@ -857,8 +1109,15 @@ abstract class ActiveRecord extends Model
             return false;
         }
 
-        $id = static::$_db->insert($this);
-        if($id) $this->afterInsert();
+        $primaryKey = static::primaryKey();
+
+        $data = $this->toRawArray();
+        $id = static::adapter()->insert([static::tableName(), $primaryKey], $data);
+
+        if($id) {
+            $this->_data[$primaryKey] = $id;
+            $this->afterInsert();
+        }
 
         return $id;
     }
@@ -882,7 +1141,9 @@ abstract class ActiveRecord extends Model
         $fields = static::fields();
 
         // Fill magic fields
-        if(array_key_exists('updated',    $fields)) $this->_data['updated']    = date('Y-m-d H:i:s', cot::$sys['now']);
+        if(array_key_exists(static::UPDATED_AT, $fields)) {
+            $this->_data[static::UPDATED_AT] = date('Y-m-d H:i:s', \cot::$sys['now']);
+        }
         if(array_key_exists('updated_by', $fields)) $this->_data['updated_by'] = \cot::$usr['id'];
 
         $return = true;
@@ -893,7 +1154,7 @@ abstract class ActiveRecord extends Model
         }
         /* ===== */
 
-        $event = new Event;
+        $event = new ModelEvent;
         $this->trigger(self::EVENT_BEFORE_UPDATE, $event);
 
         return $return && $event->isValid;
@@ -901,16 +1162,32 @@ abstract class ActiveRecord extends Model
 
     /**
      * Update object
-     * @todo Отправлять на сохранение только измененные поля
+     *
+     * @return bool|int
+     * @throws \Exception
      */
     protected final function update()
     {
         if (!$this->beforeUpdate()) {
             return false;
         }
+
         $className = get_called_class();
 
-        if (static::$_db->update($this) === 0) return 0;
+        $changedFields = $this->changedFields();
+        if(empty($changedFields)) return 0;
+
+        $allData = $this->toRawArray();
+        $data = [];
+        foreach ($changedFields as $field) {
+            if(array_key_exists($field, $allData)) $data[$field] = $allData[$field];
+        }
+        //$adapter = static::adapter();
+        $condition = [[static::primaryKey(), '=', $this->getId()]];
+        if(static::adapter()->update(static::tableName(), $data, $condition, [], true) === 0) {
+            return 0;
+        }
+
         unset(self::$_stCache[$className][$this->getId()]);
         $this->afterUpdate();
     }
@@ -934,13 +1211,16 @@ abstract class ActiveRecord extends Model
      * ```php
      * Customer::updateAll(['status' => 1], 'status = 2');
      * ```
+     * Warning: If you do not specify any condition, this method will update all rows in the table.
      *
-     * @param array $data       Values (name-value pairs) to be saved into the table
-     * @param mixed $condition  Conditions that will be put in the WHERE part of the UPDATE SQL.
+     * Note: that this method will not trigger any events.
+     *
+     * @param array $data Values (name-value pairs) to be saved into the table
+     * @param string|array $condition  Conditions that will be put in the WHERE part of the UPDATE SQL.
      * @return int Number of rows updated
      * @throws \Exception
      */
-    public static function updateAll($data, $condition = '', $params = array()){
+    public static function updateAll($data, $condition = '', $params = []){
         if (empty($data)) {
             throw new \Exception('$data is empty');
         }
@@ -959,7 +1239,7 @@ abstract class ActiveRecord extends Model
         }
         /* ===== */
 
-        $event = new Event;
+        $event = new ModelEvent;
         $this->trigger(self::EVENT_BEFORE_DELETE, $event);
 
         return $return && $event->isValid;
@@ -967,6 +1247,7 @@ abstract class ActiveRecord extends Model
 
     /**
      * Delete object
+     * @todo Remove all data from relations junction tables.
      */
     public function delete()
     {
@@ -978,7 +1259,7 @@ abstract class ActiveRecord extends Model
         $primaryKey = static::primaryKey();
 
         if(!empty($cot_extrafields[$tableName])) {
-            // Не очень хорошее решение, но в Cotonti имена полей хранятся без префиска.
+            // Не очень хорошее решение, но в Cotonti имена полей хранятся без префиска поля в таблице.
             $column_prefix = substr($primaryKey, 0, strpos($primaryKey, "_"));
             $column_prefix = (!empty($column_prefix)) ? $column_prefix . '_' : '';
 
@@ -987,7 +1268,9 @@ abstract class ActiveRecord extends Model
             }
         }
 
-        static::$_db->delete($this);
+        //static::$_db->delete($this);
+        $condition = [[static::primaryKey(), '=', $this->getId()]];
+        static::adapter()->delete(static::tableName(), $condition);
         unset(self::$_stCache[$className][$this->getId()]);
 
         $this->afterDelete();
@@ -1013,7 +1296,7 @@ abstract class ActiveRecord extends Model
             }
         }
 
-        unset($this->_errors, $this->_linkData);
+        unset($this->_errors, $this->_relations);
 
         return true;
     }
@@ -1158,25 +1441,27 @@ abstract class ActiveRecord extends Model
      *
      * @return null|array
      */
-    public static function getColumns($real = false, $cache = true)
+    public static function columns($real = false, $cache = true)
     {
-        if ($real) return static::$_db->getFields(static::tableName());
+        //if ($real) return static::$_db->getFields(static::tableName());
 
         $className = get_called_class();
 
-        static $cols   = array();
+        static $cols = [];
 
         if($cache && !empty($cols[$className]))  return $cols[$className];
 
         $fields = static::fields($real, $cache);
         // Не включаем связи ко многим и, также, указывающие на другое поле
-        $cols[$className] = array();
+        $cols[$className] = [];
         foreach ($fields as $name => $field) {
-            if (!isset($field['link']) ||
-                (in_array($field['link']['relation'], array(\Som::TO_ONE, \Som::TO_ONE_NULL)) && !isset($field['link']['localKey']))
-            ) {
-                $cols[$className][] = $name;
+            if(isset($field['relation'])) {
+                if($field['relation']['type'] != Db::BELONGS_TO) continue;
+                if(!isset($field['link']['localKey'])) continue;
+                if($field['link']['localKey'] != $name) continue;
             }
+
+            $cols[$className][] = $name;
         }
 
         return $cols[$className];
@@ -1189,22 +1474,25 @@ abstract class ActiveRecord extends Model
      */
     public function rawValue($column)
     {
-        $fields = static::fields();
+        //$fields = static::fields();
 
-        if(isset($fields[$column]) && $fields[$column]['type'] == 'link' && in_array($fields[$column]['link']['relation'],
-                array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
-            if(isset($this->_linkData[$column])) return $this->_linkData[$column];
-            return null;
-
-        } elseif (isset($this->_data[$column])) {
+        if (isset($this->_data[$column])) {
             return $this->_data[$column];
         }
+
+        // Relations data
+//        if(isset($fields[$column]) && $fields[$column]['type'] == 'link' && in_array($fields[$column]['link']['relation'],
+//                array(DB::TO_MANY, DB::TO_MANY_NULL))) {
+//            if(isset($this->_linkData[$column])) return $this->_linkData[$column];
+//            return null;
+//
+//        }
 
         return null;
     }
 
     /**
-     * Возвращает список названий полей, обязательных для заполнения
+     * Returns the list of required field names
      * @return array
      */
     public function requiredFields()
@@ -1227,11 +1515,6 @@ abstract class ActiveRecord extends Model
         foreach ($fields as $name => $field) {
             if ($name !== static::primaryKey()) {
                 if (isset($field['nullable']) && !$field['nullable']) $requiredFields[] = $name;
-
-                if (isset ($field['type']) && ($field['type'] == 'link')
-                    && (in_array($field['link']['relation'], array(\Som::TO_MANY, \Som::TO_ONE))) ) {
-                    $requiredFields[] = $name;
-                }
             }
         }
 
@@ -1375,7 +1658,7 @@ abstract class ActiveRecord extends Model
 
         if (empty($validateFields)) {
             // Получить все поля модели
-            $validateFields = static::getColumns();
+            $validateFields = static::columns();
             foreach ($fields as $name => $fld) {
                 if (!in_array($name, $validateFields)) $validateFields[] = $name;
             }
@@ -1513,12 +1796,12 @@ abstract class ActiveRecord extends Model
      */
     public static function tableName()
     {
-        global $db_x;
+        $prefix = static::adapter()->getTablePrefix();
 
         if(static::$_tableName === null) {
             $className = explode('\\', get_called_class());
             $className = end($className);
-            static::$_tableName = $db_x.Inflector::tableize($className);
+            static::$_tableName = $prefix.Inflector::tableize($className);
         }
 
         return static::$_tableName;

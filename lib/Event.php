@@ -5,6 +5,10 @@
  * @license http://www.yiiframework.com/license/
  */
 
+namespace lib;
+
+defined('COT_CODE') or die('Wrong URL.');
+
 /**
  * Event is the base class for all event classes.
  *
@@ -28,7 +32,7 @@ class Event extends BaseObject
      */
     public $name;
     /**
-     * @var object the sender of this event. If not set, this property will be
+     * @var \object the sender of this event. If not set, this property will be
      * set as the object whose "trigger()" method is called.
      * This property may also be a `null` when this event is a
      * class-level event which is triggered in a static context.

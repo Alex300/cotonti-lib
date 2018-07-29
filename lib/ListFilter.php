@@ -25,6 +25,10 @@ $filterConfig = array(
 
 */
 
+namespace lib;
+
+defined('COT_CODE') or die('Wrong URL.');
+
 /**
  * Filters for SOM
  *

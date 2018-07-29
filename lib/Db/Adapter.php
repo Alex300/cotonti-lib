@@ -1,11 +1,18 @@
 <?php
 
-namespace Som;
+namespace lib\Db;
 
-use Helpers\Inflector;
+defined('COT_CODE') or die('Wrong URL.');
+
+use lib\Db;
+use lib\Db\Query\Builder;
+use lib\Helpers\Inflector;
 
 /**
  * Abstract DB Adapter class
+ *
+ * @todo transaction support
+ * @todo parse conditions, parse orders and ect move to builder class
  */
 abstract class Adapter
 {
@@ -14,16 +21,43 @@ abstract class Adapter
      */
     protected static $connections = array();
 
+    protected $dataBaseType = '';
+
     /**
      * @var string Символ quoted identifier
+     * @deprecated
      */
-    protected $tableQuote = '';
+    //protected $tableQuote = '';
+
+    /**
+     * Character used to quote schema, table, etc. names.
+     * An array of 2 characters can be used in case starting and ending characters are different.
+     *
+     * @var string|string[]
+     */
+    protected $tableQuoteCharacter = "'";
+
+    /**
+     * Character used to quote column names.
+     * An array of 2 characters can be used in case starting and ending characters are different.
+     *
+     * @var string|string[]
+     */
+    protected $columnQuoteCharacter = '"';
+
+
+    protected $tablePrefix = '';
+
+    /**
+     * @var Builder
+     */
+    protected $builder = null;
 
     /**
      * @var array
      * @deprecated
      */
-    protected $_dbinfo = null;
+    //protected $_dbinfo = null;
 
     /**
      * Number of rows affected by the most recent query
@@ -59,43 +93,44 @@ abstract class Adapter
 
     /**
      * @param string $dbc
-     * @param array  $dbInfo
+     * @throws \Exception
      */
-    function __construct($dbc = 'db', $dbInfo = [])
+    function __construct($dbc = 'db')
     {
         $this->_adapter = static::connect($dbc);
-        $this->_dbinfo = $dbInfo;
+        $settings = Db::connectionSettings($dbc);
+
+        if(isset($settings['prefix'])) $this->tablePrefix = $settings['prefix'];
     }
 
     /**
      * Connect to Data Base
      * @param $dbc
      * @return \PDO
+     * @throws \Exception
      */
-    protected static function connect($dbc) {
+    protected static function connect($dbc)
+    {
         if (empty(self::$connections[$dbc])) {
 
             // Connect to DB
-            if($dbc == 'db'){
-                // Default cotonti connection
-                self::$connections[$dbc] = \cot::$db;
-            }else{
-                // Альтернативное соединение из конфига
-                $dbc_port = empty(\cot::$cfg[$dbc]['port']) ? '' : ';port=' . \cot::$cfg[$dbc]['port'];
-                $dsn = \cot::$cfg[$dbc]['adapter'] . ':host=' . \cot::$cfg[$dbc]['host'] . $dbc_port .
-                    ';dbname=' . \cot::$cfg[$dbc]['dbname'];
-                self::$connections[$dbc] = new \PDO($dsn, \cot::$cfg[$dbc]['username'], \cot::$cfg[$dbc]['password']);
-            }
+            $cfg = Db::connectionSettings($dbc);
+
+            $dbc_port = empty($cfg['port']) ? '' : ';port=' . $cfg['port'];
+
+            $dsn = $cfg['adapter'] . ':host=' . $cfg['host'] . $dbc_port .';dbname=' . $cfg['dbname'];
+
+            self::$connections[$dbc] = new \PDO($dsn, $cfg['username'], $cfg['password']);
         }
 
         return self::$connections[$dbc];
     }
 
     /**
-     * Закрываем соединение с БД
+     * Close DB connection
      * @param $dbc
      */
-    public static function closeConnect($dbc){
+    public static function closeConnection($dbc){
         unset(self::$connections[$dbc]);
     }
 
@@ -190,6 +225,49 @@ abstract class Adapter
     abstract public function describeTable($tableName, $schemaName = null);
 
 
+    public function getBuilder()
+    {
+        if(empty($this->builder)) {
+            $className = '\lib\Db\\' . $this->dataBaseType . '\Builder';
+            if (class_exists($className)) {
+                $this->builder = new $className($this);
+
+            } else {
+                // Fallback
+                $this->builder = new \lib\Db\Query\Builder($this);
+            }
+        }
+        return $this->builder;
+    }
+
+    /**
+     * Get the connection's table prefix.
+     *
+     * @return string
+     */
+    public function getTablePrefix()
+    {
+        return $this->tablePrefix;
+    }
+
+    /**
+     * Set the connection's table prefix.
+     *
+     * @param  string  $prefix
+     * @return $this
+     */
+    public function setTablePrefix($prefix)
+    {
+        $this->tablePrefix = $prefix;
+
+        return $this;
+    }
+
+    public function getDataBaseType()
+    {
+        return $this->dataBaseType;
+    }
+
     /**
      * 1) If called with one parameter:
      * Works like PDO::query()
@@ -204,13 +282,11 @@ abstract class Adapter
      * @return \PDOStatement
      * @throws \Exception
      */
-    public function query($query, $parameters = array())
+    public function query($query, $parameters = [])
     {
 
         if (!is_array($parameters)) $parameters = array($parameters);
 
-//        try
-//        {
         if (count($parameters) > 0) {
             $result = $this->_adapter->prepare($query);
             $this->_bindParams($result, $parameters);
@@ -227,14 +303,7 @@ abstract class Adapter
                 throw new \Exception('SQL Error: ' . $array[2]);
             }
         }
-//        }
-//        catch (PDOException $err)
-//        {
-//            if ($this->_parseError($err, $err_code, $err_message))
-//            {
-//                cot_diefatal('SQL error ' . $err_code . ': ' . $err_message);
-//            }
-//        }
+
         // We use PDO::FETCH_ASSOC by default to save memory
         $result->setFetchMode(\PDO::FETCH_ASSOC);
         $this->_affected_rows = $result->rowCount();
@@ -245,61 +314,90 @@ abstract class Adapter
     /**
      * Get a list of active record models that match the specified condition
      *
-     * @param  array $conditions
-     * @param  int $limit
-     * @param  int $offset
-     * @param  array|string $order
-     * @param  array $columns
+     * @param string|ActiveRecord $tableName table name or ActiveRecord model class name or Active record instance
+     * @param array $conditions
+     * @param int   $limit
+     * @param int   $offset
+     * @param array|string $order
+     * @param array $columns
+     *
      * @return bool|ActiveRecord[]
-     * @throws \Exception
+     * @throws \ReflectionException
      */
-    public function fetch($conditions = array(), $limit = 0, $offset = 0, $order = '', $columns = Array())
+    public function fetch($tableName = '', $conditions = [], $limit = 0, $offset = 0, $order = '', $columns = [])
     {
-        $tq = $this->tableQuote;
-        /** @var ActiveRecord $model */
-        $model = $this->_dbinfo['class'];
-        $table = $model::tableName();
+        $hasModel = false;
 
-        $joins = array();
-        $addColumns = array();
+        /** @var ActiveRecord $modelClass */
+        $modelClass = null;
+        if ($tableName instanceof ActiveRecord) {
+            $modelClass = get_class($tableName);
+            $hasModel = true;
 
-        if (empty($columns)) {
-            $calssCols = $model::getColumns();
-
-        } else {
-            $calssCols = $columns;
+        } elseif (is_string($tableName)) {
+            if(class_exists($tableName)) {
+                $classReflection = new \ReflectionClass($tableName);
+                $hasModel = $classReflection->isSubclassOf(ActiveRecord::class);
+                if ($hasModel) {
+                    $modelClass = $tableName;
+                }
+            }
         }
 
-        if (!empty($model::$fetchJoins))   $addJoins   = $model::$fetchJoins;
-        if (!empty($model::$fetchColumns)) $addColumns = $model::$fetchColumns;
+        if(!empty($modelClass)) $tableName = $modelClass::tableName();
 
-        $columns = array();
+        $joins = [];
+        $addColumns = [];
+
+        $calssCols = !empty($columns) ? $columns : ['*'];
+
+//        if (empty($columns)) {
+//            if(!empty())
+//            $calssCols = $modelClass::columns();
+//
+//        } else {
+//            $calssCols = $columns;
+//        }
+
+        if (!empty($modelClass::$fetchJoins))   $addJoins   = $modelClass::$fetchJoins;
+        if (!empty($modelClass::$fetchColumns)) $addColumns = $modelClass::$fetchColumns;
+
+        $columns = [];
         foreach ($calssCols as $col) {
-            $columns[] = "{$tq}$table{$tq}.{$tq}$col{$tq}";
+            $columns[] = $this->quoteTableName($tableName).'.'.$this->quoteColumnName($col);
         }
         if (!empty($addColumns)) $columns = array_merge($columns, $addColumns);
         $columns = implode(', ', $columns);
 
-        list($where, $params, $joins) = $this->parseConditions($conditions);
+        list($where, $params, $joins) = $this->parseConditions($tableName, $conditions);
         if (!empty($addJoins)) $joins = array_merge($joins, $addJoins);
         $joins = implode("\n", $joins);
 
+        //$this->getBuilder()
 
         if (!empty($order)) $order = $this->parseOrder($order);
-        $order = ($order) ? "ORDER BY $order" : '';
-        $limit = ($limit) ? "LIMIT $limit OFFSET $offset" : '';
+        $where = ($where) ? "\n WHERE {$where}" : '';
+        $order = ($order) ? "\n ORDER BY $order" : '';
+        $limit = ($limit) ? "\n LIMIT $limit OFFSET $offset" : '';
+        $joins = ($joins) ? "\n $joins" : '';
 
-        $objects = array();
-        $sql = "SELECT $columns\n FROM {$tq}$table{$tq}\n $joins\n $where\n $order\n $limit";
+        $sql = "SELECT $columns\n FROM ".$this->quoteTableName($tableName).$joins.$where.$order.$limit;
 
         $res = $this->query($sql, $params);
         if ($res === false) {
             $array = $this->_adapter->errorInfo();
             throw new \Exception('SQL Error: ' . $array[2]);
         }
+
+        $result = [];
         while ($row = $res->fetch(\PDO::FETCH_ASSOC)) {
-            $obj = new $model($row);
-            $objects[$row[$model::primaryKey()]] = $obj;
+            if(!empty($modelClass)) {
+                $obj = new $modelClass($row);
+                $result[$row[$modelClass::primaryKey()]] = $obj;
+
+            } else {
+                $result[] = $row;
+            }
         }
 
         if ($res->closeCursor() === false) {
@@ -307,7 +405,7 @@ abstract class Adapter
             throw new \Exception('SQL Error: ' . $array[2]);
         }
 
-        return (count($objects) > 0) ? $objects : null;
+        return (count($result) > 0) ? $result : null;
     }
 
     /**
@@ -319,15 +417,16 @@ abstract class Adapter
      * @throws \Exception
      * @return int
      */
-    public final function getCount($table = '', $conditions)
+    public final function getCount($table, $conditions)
     {
-        $tq = $this->tableQuote;
+        $modelClass = null;
+
         if (empty($table)) {
-            $table = $this->_dbinfo['tbname'];
-            if(!empty($this->_dbinfo['class'])){
-                /** @var ActiveRecord $model_name */
-                $model_name = $this->_dbinfo['class'];
-                if (!empty($model_name::$fetchJoins)) $addJoins = $model_name::$fetchJoins;
+            if($table instanceof ActiveRecord) {
+                $modelClass = $table;
+                $table = $modelClass::tableName();
+
+                if (!empty($modelClass::$fetchJoins)) $addJoins = $modelClass::$fetchJoins;
             }
         }
 
@@ -335,12 +434,13 @@ abstract class Adapter
         if (!empty($addJoins)) $joins = array_merge($joins, $addJoins);
         $joins = implode("\n", $joins);
 
-        $sql = "SELECT COUNT(*) FROM {$tq}$table{$tq}\n $joins\n $where\n";
+        $sql = "SELECT COUNT(*) FROM ".$this->quoteColumnName($table)."\n $joins\n $where\n";
         $res = $this->query($sql, $params)->fetchColumn();
         if ($res === false) {
             $array = $this->_adapter->errorInfo();
             throw new \Exception('SQL Error: ' . $array[2]);
         }
+
         return intval($res);
     }
 
@@ -354,7 +454,8 @@ abstract class Adapter
      * Performs single row INSERT if $data is an associative array,
      * performs multi-row INSERT if $data is a 2D array (numeric => assoc)
      *
-     * @param string|ActiveRecord $table_name Table name
+     * @param string|array $tableName Table name or array [tableName, primaryKey]
+     *       last needed to execute lastInsertId in PostgreSql with generated sequence name
      * @param array|bool $data Associative or 2D array containing data for insertion.
      * @param bool $insert_null Insert SQL NULL for empty values rather than ignoring them.
      * @param bool $ignore Ignore duplicate key errors on insert
@@ -362,20 +463,23 @@ abstract class Adapter
      * @return int The number of affected records
      * @throws \Exception
      */
-    public function insert($table_name, $data = false, $insert_null = false, $ignore = false, $update_fields = array()) {
-        $model = null;
-        $tq = $this->tableQuote;
-
-        $pkey = '';
-        if ($table_name instanceof ActiveRecord) {
-            $model = $table_name;
-            $table_name = $model::tableName();
-            $pkey = $model::primaryKey();
-
-            if (empty($data)) $data = $model->toArray();
-        }
+    public function insert($tableName, $data = false, $insert_null = false, $ignore = false, $update_fields = array()) {
+        //$modelClass = null;
+        $primaryKey = '';
+//        if ($tableName instanceof ActiveRecord) {
+//            $modelClass = $tableName;
+//            $tableName = $modelClass::tableName();
+//            $pkey = $modelClass::primaryKey();
+//
+//            if (empty($data)) $data = $modelClass->toRawArray();
+//        }
 
         if (!is_array($data)) return 0;
+
+        if(is_array($tableName)) {
+            $primaryKey = $tableName[1];
+            $tableName = $tableName[0];
+        }
 
         $keys = '';
         $vals = '';
@@ -385,6 +489,7 @@ abstract class Adapter
         // Build the query
         if ($multiline) {
             $rowset = & $data;
+
         } else {
             $rowset = array($data);
         }
@@ -402,7 +507,7 @@ abstract class Adapter
                     if ($j > 0) $vals .= ',';
                     if (!$keys_built) {
                         if ($j > 0) $keys .= ',';
-                        $keys .= "{$tq}$key{$tq}";
+                        $keys .= $this->quoteColumnName($key);
                     }
                     if (is_null($val) || $val === 'NULL') {
                         $vals .= 'NULL';
@@ -427,13 +532,13 @@ abstract class Adapter
         }
         if (!empty($keys) && !empty($vals)) {
             $ignore = $ignore ? 'IGNORE' : '';
-            $query = "INSERT $ignore INTO {$tq}$table_name{$tq} ($keys) VALUES $vals";
+            $query = "INSERT $ignore INTO {$this->quoteTableName($tableName)} ($keys) VALUES $vals";
             if (count($update_fields) > 0) {
                 $query .= ' ON DUPLICATE KEY UPDATE';
                 $j = 0;
                 foreach ($update_fields as $key) {
                     if ($j > 0) $query .= ',';
-                    $query .= " {$tq}$key{$tq} = VALUES({$tq}$key{$tq})";
+                    $query .= ' '.$this->quoteColumnName($key).' = VALUES('.$this->quoteColumnName($key).')';
                     $j++;
                 }
             }
@@ -448,22 +553,22 @@ abstract class Adapter
             }
 //            $this->_stopTimer($query);
 
-            $id = $this->lastInsertId($table_name, $pkey);
+            $id = $this->lastInsertId($tableName, $primaryKey);
 
-            if ($id > 0 && !empty($model)) {
-                $data[$pkey] = $id;
-                $fields = $model::fields();
-                $model->{$pkey} = $id;
-                if (!empty($fields)) {
-                    foreach ($fields as $fieldName => $field) {
-                        if (isset($field['link']) && in_array($field['link']['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
-                            $fieldData = $model->rawValue($fieldName);
-                            if (empty($fieldData)) $fieldData = null;
-                            $this->saveXRef($field['link']["model"], $data[$pkey], $fieldData, $fieldName);
-                        }
-                    }
-                }
-            }
+//            if ($id > 0 && !empty($model)) {
+//                $data[$pkey] = $id;
+//                $fields = $model::fields();
+//                $model->{$pkey} = $id;
+//                if (!empty($fields)) {
+//                    foreach ($fields as $fieldName => $field) {
+//                        if (isset($field['link']) && in_array($field['link']['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL))) {
+//                            $fieldData = $model->rawValue($fieldName);
+//                            if (empty($fieldData)) $fieldData = null;
+//                            $this->saveXRef($field['link']["model"], $data[$pkey], $fieldData, $fieldName);
+//                        }
+//                    }
+//                }
+//            }
 
             return $id;
         }
@@ -488,65 +593,64 @@ abstract class Adapter
      * - PHP NULL => SQL NULL
      * - 'NOW()' => SQL NOW()
      *
-     * @param string|ActiveRecord $table_name Table name
+     * @param string $tableName Table name
      * @param array|bool $data Associative or 2D array containing data for update
-     * @param string $condition Body of SQL WHERE clause
+     * @param array|string $condition Body of SQL WHERE clause
      * @param array $parameters Array of statement input parameters, see http://www.php.net/manual/en/pdostatement.execute.php
      * @param bool $update_null Nullify cells which have null values in the array. By default they are skipped
      * @return int The number of affected records or FALSE on error
      * @throws \Exception
      */
-    public function update($table_name, $data = false, $condition = '', $parameters = array(), $update_null = false) {
-        $model = null;
-        $tq = $this->tableQuote;
-
-        if ($table_name instanceof ActiveRecord) {
-            $model = $table_name;
-            $table_name = $model::tableName();
-            $pkey = $model::primaryKey();
-
-            if (empty($data)) {
-                // When save models, by default we must save null values too
-                if(empty($condition) && empty($parameters)) $update_null = true;
-                $data = $model->toArray();
-            }
-            $id = $data[$pkey];
-            unset($data[$data[$pkey]]);
-            $condition = "{$pkey}={$id}";
-        }
+    public function update($tableName, $data = false, $condition = '', $parameters = array(), $update_null = false) {
+//        $model = null;
+//        $tq = $this->tableQuote;
+//
+//        if ($table_name instanceof ActiveRecord) {
+//            $model = $table_name;
+//            $table_name = $model::tableName();
+//            $pkey = $model::primaryKey();
+//
+//            if (empty($data)) {
+//                // When save models, by default we must save null values too
+//                if(empty($condition) && empty($parameters)) $update_null = true;
+//                $data = $model->toArray();
+//            }
+//            $id = $data[$pkey];
+//            unset($data[$data[$pkey]]);
+//            $condition = "{$pkey}={$id}";
+//        }
 
         if (!is_array($data)) return 0;
 
         // Сохранить связи
-        if (!empty($model)) {
-            $fields = $model::fields();
-            if (!empty($fields)) {
-                foreach ($fields as $name => $field) {
-                    if (isset($field['link']) && in_array($field['link']['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
-                        $fieldData = $model->rawValue($name);
-                        if (empty($fieldData)) $fieldData = null;
-                        $this->saveXRef($field['link']["model"], $id, $fieldData, $name);
-                    }
-                }
-            }
-        }
+//        if (!empty($model)) {
+//            $fields = $model::fields();
+//            if (!empty($fields)) {
+//                foreach ($fields as $name => $field) {
+//                    if (isset($field['link']) && in_array($field['link']['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
+//                        $fieldData = $model->rawValue($name);
+//                        if (empty($fieldData)) $fieldData = null;
+//                        $this->saveXRef($field['link']["model"], $id, $fieldData, $name);
+//                    }
+//                }
+//            }
+//        }
 
         $upd = '';
         if (!is_array($parameters)) $parameters = array($parameters);
 
-        if(!is_object($table_name) && is_array($condition) && !empty($condition)){
-            $class = $this->_dbinfo['class'];
-            $class = new $class();
-            list($condition, $parameters) = $this->parseConditions($condition);
-            unset($class);
-        } else {
-            $condition = empty($condition) ? '' : 'WHERE ' . $condition;
+        if(is_array($condition) && !empty($condition)){
+            list($condition, $condParameters) = $this->parseConditions($tableName, $condition);
+            $parameters = array_merge($condParameters);
+
         }
+
+        $condition = empty($condition) ? '' : 'WHERE ' . $condition;
 
         foreach ($data as $key => $val) {
             if (is_null($val) && !$update_null) continue;
 
-            $upd .= "{$tq}$key{$tq}=";
+            $upd .= $this->quoteColumnName($key).'=';
             if (is_null($val) || $val === 'NULL') {
                 $upd .= 'NULL,';
                 
@@ -566,7 +670,7 @@ abstract class Adapter
 
         if (!empty($upd)) {
             $upd = mb_substr($upd, 0, -1);
-            $query = "UPDATE {$tq}$table_name{$tq} SET $upd $condition";
+            $query = "UPDATE {$this->quoteTableName($tableName)} SET $upd $condition";
             if (count($parameters) > 0) {
                 $stmt = $this->_adapter->prepare($query);
 
@@ -574,14 +678,14 @@ abstract class Adapter
 
                 if ($stmt->execute() === false) {
                     $array = $this->_adapter->errorInfo();
-                    throw new Exception('SQL Error: ' . $array[2]);
+                    throw new \Exception('SQL Error: ' . $array[2]);
                 }
 
             } else {
                 $res = $this->_adapter->exec($query);
                 if ($res === false) {
                     $array = $this->_adapter->errorInfo();
-                    throw new Exception('SQL Error: ' . $array[2]);
+                    throw new \Exception('SQL Error: ' . $array[2]);
                 }
                 if (empty($res))  return 0;
             }
@@ -594,36 +698,45 @@ abstract class Adapter
     /**
      * Performs simple SQL DELETE query and returns number of removed items.
      *
-     * @param string $table_name |\Som_Model_ActiveRecord Table name
+     * @param string $tableName Table name
      * @param string $condition Body of WHERE clause
      * @param array $parameters Array of statement input parameters, see http://www.php.net/manual/en/pdostatement.execute.php
      * @return int Number of records removed on success or FALSE on error
      * @throws \Exception
      */
-    public function delete($table_name, $condition = '', $parameters = array()) {
-        $model = null;
-        $tq = $this->tableQuote;
+    public function delete($tableName, $condition = '', $parameters = array())
+    {
+//        $model = null;
+//
+//        if ($table_name instanceof ActiveRecord) {
+//            $model = $table_name;
+//            $table_name = $model::tableName();
+//            $pkey = $model::primaryKey();
+//
+//            $id = $model->getId();
+//            $condition = "{$pkey}={$id}";
+//
+//            $fields = $model::fields();
+//            if (!empty($fields)) {
+//                // Remove all data from relations junction tables
+//                // Todo move to active record
+//                foreach ($fields as $name => $field) {
+//                    if ($field['type'] == 'link' && in_array($field['link']['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
+//                        $this->deleteXRef($field['link']["model"], $id, $name);
+//                    }
+//                }
+//            }
+//        }
 
-        if ($table_name instanceof ActiveRecord) {
-            $model = $table_name;
-            $table_name = $model::tableName();
-            $pkey = $model::primaryKey();
-
-            $id = $model->getId();
-            $condition = "{$pkey}={$id}";
-
-            $fields = $model->fieldList();
-            if (!empty($fields)) {
-                foreach ($fields as $name => $field) {
-                    if ($field['type'] == 'link' && in_array($field['link']['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
-                        $this->deleteXRef($field['link']["model"], $id, $name);
-                    }
-                }
-            }
+        if(is_array($condition) && !empty($condition)){
+            list($condition, $condParameters) = $this->parseConditions($tableName, $condition);
+            $parameters = array_merge($condParameters);
         }
 
-        $query = empty($condition) ? "DELETE FROM {$tq}$table_name{$tq}" : "DELETE FROM {$tq}$table_name{$tq} WHERE $condition";
-        if (!is_array($parameters)) $parameters = array($parameters);
+        if(!empty($condition)) $condition = ' WHERE '.$condition;
+
+        $query = 'DELETE FROM '.$this->quoteTableName($tableName).$condition;
+        if (!is_array($parameters)) $parameters = [$parameters];
 
         if (count($parameters) > 0) {
             $stmt = $this->_adapter->prepare($query);
@@ -682,7 +795,7 @@ abstract class Adapter
                 $pairupd [] = " $field = $field " . ($inc ? '+ ' : '- ') . $val;
             }
             $upd   = implode(',', $pairupd);
-            $query = "UPDATE ".static::quoteIdentifier($tablename)." SET $upd $conditions";
+            $query = "UPDATE ".static::quoteTableName($tablename)." SET $upd $conditions";
             $res   = $this->_adapter->exec($query);
             if ($res === false) {
                 $array = $this->_adapter->errorInfo();
@@ -761,16 +874,16 @@ abstract class Adapter
      * @param array $params Optional PDO params to pass through
      * @throws \Exception
      * @return array SQL WHERE part and PDO params
-     * @todo описание условий
      */
-    public function parseConditions($conditions = array(), $params = array()) {
-        $joins    = array();
+    public function parseConditions($tableName = null, $conditions = [], $params = [])
+    {
+        $joins = [];
 
-        if (empty($conditions)) return array('', array(), array());
+        if (empty($conditions)) return ['', [], []];
 
-        $where = $this->parseCondition($conditions, $params, $joins);
+        $where = $this->parseCondition($tableName, $conditions, $params, $joins);
 
-        if(!empty($where)) $where = 'WHERE '.$where;
+        //if(!empty($where)) $where = 'WHERE '.$where;
 
         return array($where, $params, $joins);
     }
@@ -782,12 +895,30 @@ abstract class Adapter
      * @return null|string
      * @throws \Exception
      */
-    protected function parseCondition(&$conditions, &$params, &$joins, $i = 0) {
-        /** @var Model $class */
-        $class = $this->_dbinfo['class'];
-        $table = $this->_dbinfo['tbname'];
-        if(empty($table) && !empty($class))  $table = $class::tableName();
-        $tq = $this->tableQuote;
+    protected function parseCondition($tableName = null, &$conditions, &$params, &$joins, $i = 0)
+    {
+        $hasModel = false;
+        /** @var ActiveRecord $modelClass */
+        $modelClass = null;
+        if ($tableName instanceof ActiveRecord) {
+            $modelClass = get_class($tableName);
+            $hasModel = true;
+
+        } elseif (is_string($tableName)) {
+            if(class_exists($tableName)) {
+                $classReflection = new \ReflectionClass($tableName);
+                $hasModel = $classReflection->isSubclassOf(ActiveRecord::class);
+                if ($hasModel) {
+                    $modelClass = $tableName;
+                }
+            }
+        }
+
+//        /** @var Model $class */
+//        $class = $this->_dbinfo['class'];
+//        $table = $this->_dbinfo['tbname'];
+//        if(empty($table) && !empty($class))  $table = $class::tableName();
+//        $tq = $this->tableQuote;
 
         $where = '';
         $orWhere = '';
@@ -801,14 +932,13 @@ abstract class Adapter
             foreach ($conditions as $condition) {
                 $i++;
                 if (is_array($condition)) {
-                    // todo проверка существования колонки $cond[0]
-                    if (!isset($condition[1])) $condition[1] = NULL;
-                    if (empty($condition[2])) $condition[2] = '=';
-                    if (empty($condition[3]) || $condition[3] != 'OR') $condition[3] = 'AND';
+//                    if (!isset($condition[1])) $condition[1] = NULL;
+//                    if (empty($condition[2])) $condition[2] = '=';
+//                    if (empty($condition[3]) || $condition[3] != 'OR') $condition[3] = 'AND';
 
-                    $column = $condition[0];
-                    $value = $condition[1];
-                    $operand = $condition[2];
+//                    $column = $condition[0];
+//                    $value = $condition[1];
+//                    $operand = $condition[2];
 
                     /**
                      * Первый параметр  - массив. может содержать вложенные условия.
@@ -818,54 +948,78 @@ abstract class Adapter
                      * ];
                      */
                     if (isset($condition[0]) && is_array($condition[0])) {
-                        $wh = $this->parseCondition($condition[0], $params, $joins, $i);
+                        $wh = $this->parseCondition($tableName, $condition[0], $params, $joins, $i);
 
                     } else {
-                        $tblCol = (!empty($table)) ? static::quoteIdentifier($table) . '.' . static::quoteIdentifier($column) :
-                            static::quoteIdentifier($column);
+                        if(count($condition) == 2) {
+                            $column = $condition[0];
+                            $operand = '=';
+                            $value = $condition[1];
+                            $boolean = 'AND';
+
+                        } else {
+                            $column = $condition[0];
+                            $operand = $condition[1];
+                            $value = $condition[2];
+                            $boolean = (!isset($condition[3]) || $condition[3] != 'OR') ? $condition[3] : 'AND';
+                        }
 
                         if (mb_strpos($column, '.') !== false) {
                             $tmp = explode('.', $column);
-                            $tmp[0] = ($tmp[0] != '') ? $tmp[0] : $table;
-                            $tblCol = (!empty($tmp[0])) ? static::quoteIdentifier($tmp[0]) . '.' . static::quoteIdentifier($tmp[1]) :
-                                static::quoteIdentifier($tmp[1]);
+                            $tmp[0] = ($tmp[0] != '') ? $tmp[0] : $tableName;
+
+                            $tblCol = !empty($tmp[0]) ? $tmp[0].'.'.$tmp[1] : $tmp[1];
+                            $tblCol = $this->quoteColumnName($tblCol);
+
                             $column = $tmp[1];
+
+                        } else {
+                            $tblCol = !empty($tableName) ? $tableName.'.'.$column : $column;
+                            $tblCol = $this->quoteColumnName($tblCol);
                         }
 
 
                         // Если передали объект
-                        if ($condition[0] instanceof Model) {
-                            $fields = $class::fieldList();
-                            // todo дописать обработку полей
-                            if (empty($condition[1])) {
-                                // Не передали поле, ищем первое попавшиеся
-                                $fld = $class::field($condition[0]);
-                                // todo exception
-                                if (empty($fld)) throw new \Exception("В моделе '{$class}' нет связи с '" . get_class($condition[0]) . "'");
-                            } else {
-                                $fld = $class::field($condition[1]);
-                                if (empty($fld)) {
-                                    throw new \Exception("В моделе '{$class}' поле '{$condition[1]}' не найдено");
-                                }
-                                if (!is_a($condition[0], $fld['model'])) {
-                                    throw new \Exception("В условии выборки переданный объект класса '" . get_class($condition[0]) . "' не
-                                соответствует модели '{$fld['model']}' связанной c полем '{$condition[1]}'");
-                                }
-                            }
-                            $value = (int)$condition[0]->getId();
-                            $column = $fld['name'];
-                        }
+                        // ==== не нужно ====
+//                        if ($condition[0] instanceof ActiveRecord && !empty($modelClass)) {
+//                            $fields = $modelClass::fieldList();
+//                            // todo дописать обработку полей
+//                            if (empty($condition[1])) {
+//                                // Не передали поле, ищем первое попавшиеся
+//                                $fld = $modelClass::field($condition[0]);
+//                                // todo exception
+//                                if (empty($fld)) throw new \Exception("В моделе '{$modelClass}' нет связи с '" .
+//                                    get_class($condition[0]) . "'");
+//
+//                            } else {
+//                                $fld = $modelClass::field($condition[1]);
+//                                if (empty($fld)) {
+//                                    throw new \Exception("В моделе '{$modelClass}' поле '{$condition[1]}' не найдено");
+//                                }
+//                                if (!is_a($condition[0], $fld['model'])) {
+//                                    throw new \Exception("В условии выборки переданный объект класса '" . get_class($condition[0]) . "' не
+//                                соответствует модели '{$fld['model']}' связанной c полем '{$condition[1]}'");
+//                                }
+//                            }
+//                            $value = (int)$condition[0]->getId();
+//                            $column = $fld['name'];
+//                        }
+                        // ==== /не нужно ====
 
                         if ($column == 'RAW' || $column == 'SQL') {
                             $wh = $value ? $value : '';
+
                         } elseif (is_array($value)) {
                             $wh = ($value ? ($tblCol . ($operand == '<>' ? ' NOT' : '') . ' IN (' . implode(',', self::quote($value)) . ')') : '0');
+
                         } elseif ($value === null) {
                             $wh = ("{$tblCol} IS " . ($operand == '<>' ? 'NOT ' : '') . 'NULL');
+
                         } else {
                             if (strpos($value, '*') !== false) {
                                 $wh = "$tblCol LIKE :$column" . $i;
                                 $params[$column . $i] = str_replace('*', '%', $value);
+
                             } else {
                                 $wh = $tblCol . ' ' . $operand . ' :' . $column . $i;
                                 $params[$column . $i] = $value;
@@ -873,8 +1027,9 @@ abstract class Adapter
                         }
                     }
 
-                    if ($condition[3] != 'OR') {
+                    if ($boolean != 'OR') {
                         $where[] = $wh;
+
                     } else {
                         $orWhere[] = $wh;
                     }
@@ -888,13 +1043,14 @@ abstract class Adapter
                     $operator = trim($parts[2][0]);
                     $value = trim(trim($parts[3][0]), '\'"`');
                     if ($column && $operator) {
-                        $sql = (!empty($table)) ? static::quoteIdentifier($table).'.'.static::quoteIdentifier($column) :
-                            static::quoteIdentifier($column);
+                        $sql = (!empty($tableName)) ? static::quoteTableName($tableName).'.'.static::quoteColumnName($column) :
+                            static::quoteColumnName($column);
 
                         $where[] = "$sql $operator :$column";
 
                         if ((intval($value) == $value) && (strval(intval($value)) == $value)) $value = intval($value);
                         $params[$column] = $value;
+
                     } else {
                         // Поддержка прямых условий НЕ Безопасно!!!
                         $where[] = "$condition";
@@ -912,6 +1068,7 @@ abstract class Adapter
             }
             if (count($orWhere) > 0) $where .= ' OR (' . implode(') OR (', $orWhere) . ")";
         }
+
         return $where;
     }
 
@@ -957,44 +1114,154 @@ abstract class Adapter
     }
 
     /**
-     * Экранирование данных для запроса
-     * @static
-     * @param mixed $data строка или массив строк для экранирования
-     * @return array|string
+     * Quotes a string value for use in a query.
+     * 
+     * @param string|array $data string or strings array for quotting
+
+     * @return array|string the properly quoted string or array of strings
+     * @see http://php.net/manual/en/pdo.quote.php
      */
     public function quote($data)
     {
-        if (is_string($data)) return $this->_adapter->quote($data);
+        if (is_string($data)) {
+            if (($value = $this->_adapter->quote($data)) !== false) {
+                return $value;
+            }
+
+            // the driver doesn't support quote (e.g. oci)
+            return "'" . addcslashes(str_replace("'", "''", $data), "\000\n\r\\\032") . "'";
+        }
 
         if (!is_array($data)) return $data;
 
         foreach ($data as $key => $str) {
-            if (!(strval(intval($data[$key])) == $data[$key])) $data[$key] = $this->_adapter->quote($str);
+            if (!(strval(intval($data[$key])) == $data[$key])) $data[$key] = $this->quote($str);
         }
 
         return $data;
     }
 
     /**
-     * Returns the symbol the adapter uses for delimited identifiers.
-     *
-     * @return string
+     * Alias for quote()
+     * @return array|string
+     * @see quote()
      */
-    public function getQuoteIdentifierSymbol()
+    public function quoteValue($value)
     {
-        return $this->tableQuote;
+        return $this->quote($value);
     }
 
     /**
-     * Quotes an identifier.
+     * Returns the symbol the adapter uses for delimited identifiers.
      *
-     * @param string $ident The identifier.
-     * @return string The quoted identifier.
+     * @return string|array
      */
-    public function quoteIdentifier($ident)
+    public function getTableQuoteCharacter()
     {
-        $q = $this->getQuoteIdentifierSymbol();
-        return ($q . str_replace("$q", "$q$q", $ident) . $q);
+        return $this->tableQuoteCharacter;
+    }
+
+
+    /**
+     * Quotes a table name for use in a query.
+     * If the table name contains schema prefix, the prefix will also be properly quoted.
+     *
+     * If the table name is already quoted or contains special characters including '(',
+     * then this method will do nothing.
+     *
+     * @param string $name table name
+     * @return string the properly quoted table name
+     */
+    public function quoteTableName($name)
+    {
+        if (strpos($name, '(') !== false) return $name;
+
+        if (strpos($name, '.') === false) {
+            return $this->quoteSimpleTableName($name);
+        }
+
+        $parts = explode('.', $name);
+        foreach ($parts as $i => $part) {
+            $parts[$i] = $this->quoteSimpleTableName($part);
+        }
+
+        return implode('.', $parts);
+    }
+
+    /**
+     * Quotes a simple table name for use in a query.
+     * A simple table name should contain the table name only without any schema prefix.
+     * If the table name is already quoted, this method will do nothing.
+     *
+     * @param string $name table name
+     * @return string the properly quoted table name
+     */
+    public function quoteSimpleTableName($name)
+    {
+        if (is_string($this->tableQuoteCharacter)) {
+            $startChar = $endChar = $this->tableQuoteCharacter;
+
+        } else {
+            list($startChar, $endChar) = $this->tableQuoteCharacter;
+        }
+
+        if(strpos($name, $startChar) !== false) return $name;
+
+        // Not sure if it is really needed
+//        $name = str_replace($startChar, $startChar.$startChar, $name);
+//        if($startChar != $endChar) {
+//            $name = str_replace($endChar, $endChar.$endChar, $name);
+//        }
+
+        return $startChar . $name . $endChar;
+    }
+
+    /**
+     * Quotes a column name for use in a query.
+     * If the column name contains prefix, the prefix will also be properly quoted.
+     * If the column name is already quoted or contains special characters including '(', '[['
+     * then this method will do nothing.
+     *
+     * @param string $name column name
+     * @return string the properly quoted column name
+     */
+    public function quoteColumnName($name)
+    {
+        if (strpos($name, '(') !== false || strpos($name, '[[') !== false) {
+            return $name;
+        }
+
+        if (($pos = strrpos($name, '.')) !== false) {
+            $prefix = $this->quoteTableName(substr($name, 0, $pos)) . '.';
+            $name = substr($name, $pos + 1);
+
+        } else {
+            $prefix = '';
+        }
+
+        return $prefix . $this->quoteSingleColumnName($name);
+    }
+
+    /**
+     * Quotes a simple column name for use in a query.
+     * A simple column name should contain the column name only without any prefix.
+     * If the column name is already quoted or is the asterisk character '*', this method will do nothing.
+     *
+     * @param string $name column name
+     * @return string the properly quoted column name
+     */
+    public function quoteSingleColumnName($name)
+    {
+        if (is_string($this->tableQuoteCharacter)) {
+            $startChar = $endChar = $this->columnQuoteCharacter;
+
+        } else {
+            list($startChar, $endChar) = $this->columnQuoteCharacter;
+        }
+
+        if($name === '*' || strpos($name, $startChar) !== false) return $name;
+
+        return $startChar . $name . $endChar;
     }
 
     /**
@@ -1025,38 +1292,40 @@ abstract class Adapter
      * @param string $fieldName
      * @return array|bool|null
      * @throws \Exception
+     *
+     * @todo it seems we don't need this method any more
      */
-    public function loadXRef($xModel, $id, $fieldName = '')
-    {
-        if (is_string($xModel) || ($xModel instanceof ActiveRecord)) {
-            /** @var ActiveRecord $xModel */
-            $xPk = $xModel::primaryKey();
-            $linkModelDbInfo = $xModel::getDbConfig();
-
-            $xTableName = $linkModelDbInfo['tbname'];
-
-        } else {
-            return false;
-        }
-
-        $tableName = $this->_dbinfo['tbname'];
-
-        $pk = $this->_dbinfo['pkey'];
-
-        $junctionTable = $this->junctionTable($tableName, $xTableName, $pk, $xPk);
-        if(!$this->tableExists($junctionTable['name'])) return null;
-
-        $query = "SELECT ".$this->quoteIdentifier($junctionTable['relatedKey']).
-            " FROM ".$this->quoteIdentifier($junctionTable['name']).
-            " WHERE ".$this->quoteIdentifier($junctionTable['ownerKey'])."={$id} AND ".
-            $this->quoteIdentifier('name')."=".$this->quote($fieldName);
-
-        $xRefs = $this->query($query)->fetchAll(\PDO::FETCH_COLUMN);
-
-        if (count($xRefs) <= 0) return null;
-
-        return $xRefs;
-    }
+//    public function loadXRef($xModel, $id, $fieldName = '')
+//    {
+//        if (is_string($xModel) || ($xModel instanceof ActiveRecord)) {
+//            /** @var ActiveRecord $xModel */
+//            $xPk = $xModel::primaryKey();
+//            $linkModelDbInfo = $xModel::getDbConfig();
+//
+//            $xTableName = $linkModelDbInfo['tbname'];
+//
+//        } else {
+//            return false;
+//        }
+//
+//        $tableName = $this->_dbinfo['tbname'];
+//
+//        $pk = $this->_dbinfo['pkey'];
+//
+//        $junctionTable = $this->junctionTable($tableName, $xTableName, $pk, $xPk);
+//        if(!$this->tableExists($junctionTable['name'])) return null;
+//
+//        $query = "SELECT ".$this->quoteIdentifier($junctionTable['relatedKey']).
+//            " FROM ".$this->quoteIdentifier($junctionTable['name']).
+//            " WHERE ".$this->quoteIdentifier($junctionTable['ownerKey'])."={$id} AND ".
+//            $this->quoteIdentifier('name')."=".$this->quote($fieldName);
+//
+//        $xRefs = $this->query($query)->fetchAll(\PDO::FETCH_COLUMN);
+//
+//        if (count($xRefs) <= 0) return null;
+//
+//        return $xRefs;
+//    }
 
     /**
      * Save relationship between two models
@@ -1068,24 +1337,24 @@ abstract class Adapter
      * @return bool
      * @throws \Exception
      */
-    protected function saveXRef($xModel, $id, $data, $fieldName = '')
-    {
-        if (is_string($xModel) || ($xModel instanceof ActiveRecord)) {
-            /** @var ActiveRecord $xModel */
-            $xPk = $xModel::primaryKey();
-            $linkModelDbInfo = $xModel::getDbConfig();
-
-            $xTableName = $linkModelDbInfo['tbname'];
-
-        } else {
-            return false;
-        }
-
-        $tableName = $this->_dbinfo['tbname'];
-        $pk = $this->_dbinfo['pkey'];
-
-        return $this->saveRelations($tableName, $xTableName, $id, $data, $fieldName, $pk, $xPk);
-    }
+//    protected function saveXRef($xModel, $id, $data, $fieldName = '')
+//    {
+//        if (is_string($xModel) || ($xModel instanceof ActiveRecord)) {
+//            /** @var ActiveRecord $xModel */
+//            $xPk = $xModel::primaryKey();
+//            $linkModelDbInfo = $xModel::getDbConfig();
+//
+//            $xTableName = $linkModelDbInfo['tbname'];
+//
+//        } else {
+//            return false;
+//        }
+//
+//        $tableName = $this->_dbinfo['tbname'];
+//        $pk = $this->_dbinfo['pkey'];
+//
+//        return $this->saveRelations($tableName, $xTableName, $id, $data, $fieldName, $pk, $xPk);
+//    }
 
     /**
      * Save relationship between two DB tables
@@ -1099,6 +1368,8 @@ abstract class Adapter
      * @param $fieldName
      * @return bool
      * @throws \Exception
+     *
+     * @todo add indexes by key's fields
      */
     public function saveRelations($table, $relatedTable, $id, $data, $fieldName = '',  $pkey = 'id', $relatedPkey = 'id')
     {
@@ -1108,6 +1379,7 @@ abstract class Adapter
         $relatedPriKey = $junctionTable['relatedKey'];
 
         // Create junction table if it is not exists
+        $isNewTable = false;
         if(!$this->tableExists($junctionTable['name'])) {
             $this->createTable($junctionTable['name'], [
                 'xref_id' => [
@@ -1128,15 +1400,18 @@ abstract class Adapter
                     'type' => 'varchar',
                 ]
             ]);
+
+            $isNewTable = true;
         }
 
-        // Save relations
-        $query = "SELECT ".$this->quoteIdentifier($relatedPriKey)." FROM {$junctionTable['name']} WHERE ".
-            $this->quoteIdentifier($priKey)."={$id} AND ".
-            $this->quoteIdentifier('name')."=".$this->quote($fieldName);
+        // Load existing relations
+        if(!$isNewTable) {
+            $query = "SELECT " . $this->quoteColumnName($relatedPriKey) . " FROM {$junctionTable['name']} WHERE " .
+                $this->quoteColumnName($priKey) . "={$id} AND " .
+                $this->quoteColumnName('name') . "= ?";
 
-        $old_xRefs = $this->query($query)->fetchAll(\PDO::FETCH_COLUMN);
-
+            $old_xRefs = $this->query($query, [$fieldName])->fetchAll(\PDO::FETCH_COLUMN);
+        }
         if (!$old_xRefs) $old_xRefs = array();
         $kept_xRefs = array();
         $new_xRefs = array();
@@ -1161,11 +1436,12 @@ abstract class Adapter
         $rem_xRefs = array_diff($old_xRefs, $kept_xRefs);
         if (count($rem_xRefs) > 0) {
             $inCond = "(" . implode(",", $this->quote($rem_xRefs)) . ")";
-            $this->delete($junctionTable['name'], "{$priKey}=$id AND {$relatedPriKey} IN $inCond AND ".
-                $this->quoteIdentifier('name')."=".$this->quote($fieldName));
+            $this->delete($junctionTable['name'], $this->quoteColumnName($priKey).'=$id '.
+                "AND {$relatedPriKey} IN $inCond ".
+                'AND '.$this->quoteColumnName('name')."=".$this->quote($fieldName));
         }
 
-        // Add new xRefs
+        // Add new relations
         foreach ($new_xRefs as $item) {
             $isStr = !is_int($item) && !is_float($item) && is_string($item);
 
@@ -1194,23 +1470,25 @@ abstract class Adapter
      * @param $id
      * @param string $fieldName
      * @return bool
+     *
+     * @deprecated
      */
-    protected function deleteXRef($xModel, $id, $fieldName = '')
-    {
-        if (is_string($xModel) || ($xModel instanceof ActiveRecord)) {
-            /** @var ActiveRecord $xModel */
-            $xPk        = $xModel::primaryKey();
-            $xTableName = $xModel::tableName();
-
-        } else {
-            return false;
-        }
-
-        $tableName  = $this->_dbinfo['tbname'];
-        $pk         = $this->_dbinfo['pkey'];
-
-        $this->deleteRelations($tableName, $xTableName, $id, $fieldName, $pk, $xPk);
-    }
+//    protected function deleteXRef($xModel, $id, $fieldName = '')
+//    {
+//        if (is_string($xModel) || ($xModel instanceof ActiveRecord)) {
+//            /** @var ActiveRecord $xModel */
+//            $xPk        = $xModel::primaryKey();
+//            $xTableName = $xModel::tableName();
+//
+//        } else {
+//            return false;
+//        }
+//
+//        $tableName  = $this->_dbinfo['tbname'];
+//        $pk         = $this->_dbinfo['pkey'];
+//
+//        $this->deleteRelations($tableName, $xTableName, $id, $fieldName, $pk, $xPk);
+//    }
 
     /**
      * Destroys the relationship between two DB tables.
@@ -1230,8 +1508,11 @@ abstract class Adapter
         $priKey = $junctionTable['ownerKey'];
 
         if ($this->tableExists($junctionTable['name'])) {
-            $this->delete($junctionTable['name'], "{$priKey}=$id AND ".
-                $this->quoteIdentifier('name')."=".$this->quote($fieldName));
+            $condition = $this->quoteColumnName($junctionTable['name'].'.'.$priKey).'='.$id;
+            if(!is_null($fieldName)) {
+                $condition .= ' AND '.$this->quoteColumnName('name').'='.$this->quote($fieldName);
+            }
+            $this->delete($junctionTable['name'], $condition);
         }
     }
 
@@ -1241,32 +1522,54 @@ abstract class Adapter
      * The junction table name, by convention, is simply the table names
      * sorted alphabetically and concatenated with an underscore.
      *
-     * @param string $table
+     * @param string $tableName
      * @param string $relatedTable
      * @param string $primaryKey
      * @param string $relatedPrimaryKey
      * @return array
      */
-    public function junctionTable($table, $relatedTable, $primaryKey = 'id', $relatedPrimaryKey = 'id')
+    public function junctionTable($tableName, $relatedTable, $primaryKey = 'id', $relatedPrimaryKey = 'id')
     {
-        global $db_x;
+        /** @var ActiveRecord $modelClass */
+//        $modelClass = null;
+//        if ($tableName instanceof ActiveRecord) {
+//            $modelClass = get_class($tableName);
+//
+//        } elseif (is_string($tableName)) {
+//            if(class_exists($tableName)) {
+//                $classReflection = new \ReflectionClass($tableName);
+//                if ($classReflection->isSubclassOf(ActiveRecord::class)) {
+//                    $modelClass = $tableName;
+//                }
+//            }
+//        }
+//
+//        if(!empty($modelClass)) {
+//            $tableName = $modelClass::tableName();
+//        }
+
+        $prefix = $this->tablePrefix;
 
         // Remove prefixes of table names
-        $table = preg_replace("/^$db_x/iu", '', $table);
-        $relatedTable = preg_replace("/^$db_x/iu", '', $relatedTable);
+        $tableName = preg_replace("/^$prefix/iu", '', $tableName);
+        $relatedTable = preg_replace("/^$prefix/iu", '', $relatedTable);
 
         $tables = [
-            $table,
+            $tableName,
             $relatedTable,
         ];
 
         sort($tables);
 
         $ret = [
-            'name' => $db_x.strtolower(implode('_', $tables)),
-            'ownerKey' => mb_strtolower(Inflector::singularize($table) . '_' . $primaryKey),
+            'name' => $prefix.strtolower(implode('_', $tables)),
+            'ownerKey' => mb_strtolower(Inflector::singularize($tableName) . '_' . $primaryKey),
             'relatedKey' => mb_strtolower(Inflector::singularize($relatedTable) . '_' . $relatedPrimaryKey),
         ];
+
+//        if(!empty($modelClass)) {
+//            $foreignKey = $modelClass::foreignKey();
+//        }
 
         return $ret;
     }
@@ -1295,9 +1598,8 @@ abstract class Adapter
     }
 
 
-    public function getDbInfo()
-    {
-        return $this->_dbinfo;
-    }
-
+//    public function getDbInfo()
+//    {
+//        return $this->_dbinfo;
+//    }
 }
