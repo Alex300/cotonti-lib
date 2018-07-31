@@ -413,6 +413,33 @@ abstract class Model extends Component
     }
 
     /**
+     * Получить поле по названию или по связи
+     *   если полей с заданной связью несколько - вернет первое
+     * @param $params
+     * @return null
+     */
+    public static function field($params)
+    {
+        $fields = static::fields();
+
+        if (is_string($params)) return (!empty($fields[$params])) ? $fields[$params] : null;
+
+        // Если передали объект, надо искать связь
+        if ($params instanceof Model) $params = array('model' => get_class($params));
+
+        if (!empty($params['model'])) {
+            if ($params['model'] instanceof Model) $params['model'] = get_class($params['model']);
+            foreach ($fields as $fld) {
+                if (isset($fld['relation']) && $fld['relation']['model'] == $params['model']) {
+                    return $fld;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Returns the field labels.
      *
      * Fields labels are mainly used for display purpose. For example, given an attribute
@@ -506,13 +533,15 @@ abstract class Model extends Component
 
         $fields = static::fields($cache);
         // Не включаем связи ко многим и, также, указывающие на другое поле
-        $cols[$className] = array();
+        $cols[$className] = [];
         foreach ($fields as $name => $field) {
-//            if (!isset($field['link']) ||
-//                (in_array($field['link']['relation'], array(Som::TO_ONE, Som::TO_ONE_NULL)) && !isset($field['link']['localKey']))
-//            ) {
-                $cols[$className][] = $name;
-//            }
+            if(isset($field['relation'])) {
+                if($field['relation']['type'] != Db::BELONGS_TO) continue;
+                if(!isset($field['link']['localKey'])) continue;
+                if($field['link']['localKey'] != $name) continue;
+            }
+
+            $cols[$className][] = $name;
         }
 
         return $cols[$className];
@@ -533,7 +562,7 @@ abstract class Model extends Component
     }
 
     /**
-     * Возвращает список названий полей, обязательных для заполнения
+     * Returns the list of required field names
      *
      * @return array
      */
@@ -564,6 +593,40 @@ abstract class Model extends Component
 
     // ==== Методы для Валидации ====
     protected function validators(){ return []; }
+
+    public function getValidators($field = null)
+    {
+        if (!empty($field)) {
+            if (!empty($this->validators[$field]) && count($this->validators[$field]) > 0) {
+                return $this->validators[$field];
+
+            } else {
+                return null;
+            }
+        }
+
+        return $this->validators;
+    }
+
+    /**
+     * @param string $field
+     * @param mixed callback, или string ('int', 'bool', ect) или массив вадидаторов этих типов
+     *
+     * @return $this
+     * @todo проверка типов валидаторов
+     */
+    public function setValidator($field, $validators)
+    {
+        if (!is_array($validators)) $validators = array($validators);
+
+        foreach ($validators as $val) {
+            if (!isset($this->validators[$field]) || !in_array($val, $this->validators[$field])){
+                $this->validators[$field][] = $val;
+            }
+        }
+
+        return $this;
+    }
 
     public function addError($field, $message = null)
     {
@@ -680,11 +743,11 @@ abstract class Model extends Component
      *
      * @todo дописать метод
      */
-    public function validate($validateFields = null, $errorMessages = null, $clearErrors = true)
+    public function validate($validateFields = null, $errorMessages = false, $clearErrors = true)
     {
         if ($clearErrors) $this->clearErrors();
 
-        if (!$this->beforeValidate()) return false;
+        if (!$this->beforeValidate($validateFields)) return false;
 
         if (is_null($errorMessages)) $errorMessages = $this->showValidateErrors;
 
@@ -709,17 +772,14 @@ abstract class Model extends Component
                 }
             }
         }
-        $this->validators = array_merge($this->validators, $m_validators);
 
+        $allValidators = array_merge($this->validators, $m_validators);
 
         if (empty($validateFields)) {
-            // Получить все поля модели
-            $validateFields = static::columns();
-            foreach ($fields as $name => $fld) {
-                if (!in_array($name, $validateFields)) $validateFields[] = $name;
-            }
+            // All model's fields
+            $validateFields = array_keys($fields);
         }
-        $validateFields = array_merge($validateFields, array_keys($this->validators));
+        //$validateFields = array_merge($validateFields, array_keys($this->validators));
         $validateFields = array_unique($validateFields);
 
         foreach ($validateFields as $name) {
@@ -736,22 +796,23 @@ abstract class Model extends Component
 
             } elseif (isset($this->_extraData[$name])) {
                 $value = $this->$name;
-            }
-//                elseif (isset($fields[$name]) && $fields[$name]['type'] == 'link') {
-//                    $list = (array)$fields[$name]['link'];
-//                    // Многие ко многим
-//                    if (in_array($list['relation'], array(Som::TO_MANY, Som::TO_MANY_NULL)) &&
-//                        !empty($this->_linkData[$name])
-//                    ) {
-//                        $value = $this->_linkData[$name];
-//                    }
-//                }
-            $fieldName = $name;
-            $tmp = static::fieldLabel($name);
-            if (!empty($tmp)) $fieldName = $tmp;
 
-            if (isset($this->validators[$name]) && count($this->validators[$name]) > 0) {
-                foreach ($this->validators[$name] as $validator) {
+            } elseif (isset($fields[$name]) && isset($fields[$name]['relation'])) {
+                // Model has no relations
+//                $list = (array)$fields[$name]['link'];
+//                // Многие ко многим
+//                if (in_array($list['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL)) &&
+//                                                                            !empty($this->_linkData[$name]) ) {
+//                    $value = $this->_linkData[$name];
+//                }
+            }
+
+            if (isset($allValidators[$name]) && count($allValidators[$name]) > 0) {
+                $fieldName = $name;
+                $tmp = static::fieldLabel($name);
+                if (!empty($tmp)) $fieldName = $tmp;
+
+                foreach ($allValidators[$name] as $validator) {
                     // Проверка на Validator_Abstract
                     if ($validator instanceof \Validator_Abstract) {
                         $validator->setModel($this);
@@ -768,17 +829,15 @@ abstract class Model extends Component
                             if ($res !== true) $this->addError($name, $res);
 
                         } catch (\Exception $e) {
-                            throw new \Exception("Не правильный CallBack validator для поля '{$name}'");
+                            throw new \Exception("Wrong CallBack validator for field '{$name}'");
                         }
 
                     } elseif (is_string($validator)) {
                         switch (mb_strtolower($validator)) {
                             case 'required':
                                 if (($value === '') || (is_null($value))) {
-                                    $fieldName = $name;
-                                    $tmp = static::fieldLabel($name);
-                                    if(!empty($tmp)) $fieldName = $tmp;
-                                    $error = 'Field is required'.': '.$fieldName;
+                                    $error = (isset(\cot::$L['field_required_'.$name])) ? \cot::$L['field_required_'.$name] :
+                                        \cot::$L['field_required'].': '.$fieldName;
                                     $this->addError($name, $error);
                                 }
 
@@ -789,7 +848,7 @@ abstract class Model extends Component
             }
 
             // Проверка на соотвествие типу
-            if (!empty($fields[$name])) {
+            if (!empty($fields[$name]) && isset($fields[$name]['type'])) {
                 switch (mb_strtolower($fields[$name]['type'])) {
                     case 'int':
                     case 'integer':
@@ -802,11 +861,11 @@ abstract class Model extends Component
 
         $this->afterValidate($validateFields);
 
-        // Системные сообщения об ошибках
-        if (count($this->_errors) > 0 && $errorMessages) {
-            foreach ($this->_errors as $name => $errors) {
-                if (!empty($errors)) {
-                    foreach ($errors as $errorRow) {
+        // System error messages
+        if(count($this->_errors) > 0 && $errorMessages) {
+            foreach($this->_errors as $name => $errors) {
+                if(!empty($errors)) {
+                    foreach($errors as $errorRow) {
                         if (!empty($errorRow)) cot_error($errorRow, $name);
                     }
                 }

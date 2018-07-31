@@ -372,7 +372,7 @@ class Inflector
      *
      * @return string The string with all delimeter-separated words capitalized.
      */
-    public static function ucwords(string $string, string $delimiters = " \n\t\r\0\x0B-") : string
+    public static function ucwords(string $string, string $delimiters = " \n\t\r\0\x0B-")
     {
         return ucwords($string, $delimiters);
     }
@@ -381,7 +381,7 @@ class Inflector
      * Clears Inflectors inflected value caches, and resets the inflection
      * rules to the initial values.
      */
-    public static function reset() : void
+    public static function reset()
     {
         if (empty(self::$initialState)) {
             self::$initialState = get_class_vars('Inflector');
@@ -417,7 +417,7 @@ class Inflector
      *
      * @return void
      */
-    public static function rules(string $type, iterable $rules, bool $reset = false) : void
+    public static function rules(string $type, iterable $rules, bool $reset = false)
     {
         foreach ($rules as $rule => $pattern) {
             if ( ! is_array($pattern)) {
@@ -455,7 +455,7 @@ class Inflector
      *
      * @return string The word in plural form.
      */
-    public static function pluralize(string $word) : string
+    public static function pluralize(string $word)
     {
         if (isset(self::$cache['pluralize'][$word])) {
             return self::$cache['pluralize'][$word];
@@ -502,7 +502,7 @@ class Inflector
      *
      * @return string The word in singular form.
      */
-    public static function singularize(string $word) : string
+    public static function singularize(string $word)
     {
         if (isset(self::$cache['singularize'][$word])) {
             return self::$cache['singularize'][$word];

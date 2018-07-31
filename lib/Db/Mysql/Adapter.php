@@ -29,11 +29,11 @@ class Adapter extends \lib\Db\Adapter
      */
     protected static function connect($dbc)
     {
-        if (empty(Adapter::$connections[$dbc])) {
+        if (empty(\lib\Db\Adapter::$connections[$dbc])) {
             // Connect to DB
             if($dbc == 'db'){
                 // Default cotonti connection
-                Adapter::$connections[$dbc] = \cot::$db;
+                \lib\Db\Adapter::$connections[$dbc] = \cot::$db;
 
             } else {
                 // Alternate connection
@@ -53,11 +53,11 @@ class Adapter extends \lib\Db\Adapter
 
                 $dsn = $cfg['adapter'] . ':host=' . $cfg['host'] . $dbc_port .';dbname=' . $cfg['dbname'];
 
-                \Db\Adapter::$connections[$dbc] = new \PDO($dsn, $cfg['username'], $cfg['password'], $options);
+                \lib\Db\Adapter::$connections[$dbc] = new \PDO($dsn, $cfg['username'], $cfg['password'], $options);
             }
         }
 
-        return Adapter::$connections[$dbc];
+        return \lib\Db\Adapter::$connections[$dbc];
     }
 
 

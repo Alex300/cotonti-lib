@@ -351,17 +351,14 @@ abstract class Adapter
 
         $calssCols = !empty($columns) ? $columns : ['*'];
 
-//        if (empty($columns)) {
-//            if(!empty())
-//            $calssCols = $modelClass::columns();
-//
-//        } else {
-//            $calssCols = $columns;
-//        }
-
-        if (!empty($modelClass::$fetchJoins))   $addJoins   = $modelClass::$fetchJoins;
-        if (!empty($modelClass::$fetchColumns)) $addColumns = $modelClass::$fetchColumns;
-
+        if(!empty($modelClass)) {
+            if (!empty($modelClass::$fetchJoins)) {
+                $addJoins = $modelClass::$fetchJoins;
+            }
+            if (!empty($modelClass::$fetchColumns)) {
+                $addColumns = $modelClass::$fetchColumns;
+            }
+        }
         $columns = [];
         foreach ($calssCols as $col) {
             $columns[] = $this->quoteTableName($tableName).'.'.$this->quoteColumnName($col);
@@ -430,11 +427,15 @@ abstract class Adapter
             }
         }
 
-        list($where, $params, $joins) = $this->parseConditions($conditions);
+        list($where, $params, $joins) = $this->parseConditions($table, $conditions);
         if (!empty($addJoins)) $joins = array_merge($joins, $addJoins);
         $joins = implode("\n", $joins);
 
-        $sql = "SELECT COUNT(*) FROM ".$this->quoteColumnName($table)."\n $joins\n $where\n";
+        if(!empty($where)) $where = "\n WHERE ".$where;
+        if(!empty($joins)) $joins = "\n ".$joins;
+
+        $sql = "SELECT COUNT(*) FROM ".$this->quoteTableName($table).$joins.$where;
+
         $res = $this->query($sql, $params)->fetchColumn();
         if ($res === false) {
             $array = $this->_adapter->errorInfo();
@@ -719,7 +720,7 @@ abstract class Adapter
 //            $fields = $model::fields();
 //            if (!empty($fields)) {
 //                // Remove all data from relations junction tables
-//                // Todo move to active record
+//
 //                foreach ($fields as $name => $field) {
 //                    if ($field['type'] == 'link' && in_array($field['link']['relation'], array(\Som::TO_MANY, \Som::TO_MANY_NULL))) {
 //                        $this->deleteXRef($field['link']["model"], $id, $name);

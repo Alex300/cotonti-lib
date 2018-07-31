@@ -61,27 +61,6 @@ class Db
      *      In this case the by default `orders` table should have `user_id` field.
      */
 
-//    /**
-//     * @deprecated use BELONGS_TO instead with parameter nullable = false
-//     */
-//    const TO_ONE = self::BELONGS_TO;
-//
-//    /**
-//     * @deprecated use BELONGS_TO instead
-//     */
-//    const TO_ONE_NULL = self::BELONGS_TO;
-//
-//    /**
-//     * @deprecated use MANY_TO_MANY instead
-//     */
-//    const TO_MANY = self::MANY_TO_MANY;
-//
-//    /**
-//     * @deprecated use MANY_TO_MANY instead
-//     */
-//    const TO_MANY_NULL = self::MANY_TO_MANY;
-
-
     const MYSQL = 'mysql';
     const POSTGRESQL = 'pgsql';
     const MONGO = 'mongo';
@@ -107,6 +86,7 @@ class Db
      *      'username' => 'notroot',
      *      'password' => '123456',
      *      'dbname' => 'data_base_name',
+     *      'charset' => 'utf8mb4'
      * );
      *
      *
@@ -123,7 +103,7 @@ class Db
             } else {
                 $cfg = Db::connectionSettings($dbc);
 
-                $dbType = $cfg[$dbc]['adapter'];
+                $dbType = $cfg['adapter'];
 
                 $adapterClass = '\lib\Db\\'.$dbType.'\Adapter';
                 if(!class_exists($adapterClass)) throw new \Exception("DB Adapter not found «{$dbType}»");
