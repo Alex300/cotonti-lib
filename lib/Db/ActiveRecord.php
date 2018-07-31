@@ -1280,7 +1280,7 @@ abstract class ActiveRecord extends Model
      *
      * @return ActiveRecord[]
      */
-    public static function findByCondition($conditions = array(), $limit = 0, $offset = 0, $order = '')
+    public static function findByCondition($conditions = [], $limit = 0, $offset = 0, $order = '')
     {
         return static::fetch($conditions, $limit, $offset, $order);
     }
@@ -1350,7 +1350,7 @@ abstract class ActiveRecord extends Model
         return static::adapter()->fetch($className, $conditions, $limit, $offset, $order);
     }
 
-    protected function beforeSave(&$runValidation = true, &$fields = null)
+    protected function beforeSave(&$runValidation = true, &$useFields = null)
     {
         $className = get_called_class();
         $return = true;
@@ -1363,7 +1363,7 @@ abstract class ActiveRecord extends Model
 
         $event = new ModelEvent;
         $event->data['runValidation'] = $runValidation;
-        $event->data['fields'] = $fields;
+        $event->data['fields'] = $useFields;
         $this->trigger(self::EVENT_BEFORE_SAVE, $event);
 
         return $return && $event->isValid;
@@ -1376,31 +1376,31 @@ abstract class ActiveRecord extends Model
      *      before saving the record. Defaults to `true`. If the validation fails, the record
      *      will not be saved to the database and this method will return `false`.
      *
-     * @param array $fields list of fields that need to be saved. Defaults to `null`,
+     * @param array $useFields list of fields that need to be saved. Defaults to `null`,
      *      meaning all fields that was changed will be saved.
      *
      * @return int id of saved record
      * @throws \Exception
      */
-    public function save($runValidation = true, $fields = null)
+    public function save($runValidation = true, $useFields = null)
     {
         $id = null;
 
-        if (!$this->beforeSave($runValidation, $fields)) {
+        if (!$this->beforeSave($runValidation, $useFields)) {
             return false;
         }
 
-        if ($runValidation && !$this->validate($fields)) return false;
+        if ($runValidation && !$this->validate($useFields)) return false;
 
         if ($this->isNewRecord()) {
 
             // Add new record to DB
-            $id = $this->insert($runValidation, $fields);
+            $id = $this->insert($runValidation, $useFields);
 
         } else {
             // Update existing record
             $id = $this->getId();
-            $this->update($runValidation, $fields);
+            $this->update($runValidation, $useFields);
         }
 
         if($id) {
@@ -1424,7 +1424,7 @@ abstract class ActiveRecord extends Model
         $this->trigger(self::EVENT_AFTER_SAVE);
     }
 
-    protected function beforeInsert(&$runValidation = true, &$fields = null)
+    protected function beforeInsert(&$runValidation = true, &$useFields = null)
     {
         $className = get_called_class();
         $fields = static::fields();
@@ -1460,20 +1460,20 @@ abstract class ActiveRecord extends Model
      * @return int created object id
      * @throws \Exception
      */
-    protected final function insert($runValidation = true, $fields = null)
+    protected final function insert($runValidation = true, $useFields = null)
     {
-        if (!$this->beforeInsert($runValidation, $fields)) {
+        if (!$this->beforeInsert($runValidation, $useFields)) {
             return false;
         }
 
         $primaryKey = static::primaryKey();
 
         $allData = $this->toRawArray();
-        if(empty($fields)) {
+        if(empty($useFields)) {
             $data = $allData;
 
         } else {
-            foreach ($fields as $field) {
+            foreach ($useFields as $field) {
                 if(array_key_exists($field, $allData)) {
                     $data[$field] = $allData[$field];
                 }
@@ -1503,7 +1503,7 @@ abstract class ActiveRecord extends Model
         $this->trigger(self::EVENT_AFTER_INSERT);
     }
 
-    protected function beforeUpdate(&$runValidation = true, &$fields = null)
+    protected function beforeUpdate(&$runValidation = true, &$useFields = null)
     {
         $className = get_called_class();
         $fields = static::fields();
@@ -1534,9 +1534,9 @@ abstract class ActiveRecord extends Model
      * @return bool|int
      * @throws \Exception
      */
-    protected final function update($runValidation = true, $fields = null)
+    protected final function update($runValidation = true, $useFields = null)
     {
-        if (!$this->beforeUpdate($runValidation, $fields)) {
+        if (!$this->beforeUpdate($runValidation, $useFields)) {
             return false;
         }
 
@@ -1549,7 +1549,7 @@ abstract class ActiveRecord extends Model
         $data = [];
         foreach ($changedFields as $field) {
             if(array_key_exists($field, $allData)) {
-                if(empty($fields) || array_key_exists($field, $fields)) {
+                if(empty($useFields) || in_array($field, $useFields)) {
                     $data[$field] = $allData[$field];
                 }
             }

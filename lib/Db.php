@@ -78,7 +78,7 @@ class Db
      *
      * Db connection config example:
      *
-     * cot::$cfg['db_connection_name'] = array(
+     * cot::$cfg['db_connection_name'] = [
      *      'adapter' => Db::MYSQL,     // Database type. Db::MYSQL, Db::ADAPTER_POSTGRESQL or Db::ADAPTER_MONGO
      *      'host' => '127.0.0.1',
      *      'port' => null,
@@ -87,7 +87,7 @@ class Db
      *      'password' => '123456',
      *      'dbname' => 'data_base_name',
      *      'charset' => 'utf8mb4'
-     * );
+     * ];
      *
      *
      * @return \lib\Db\Adapter
@@ -103,7 +103,7 @@ class Db
             } else {
                 $cfg = Db::connectionSettings($dbc);
 
-                $dbType = $cfg['adapter'];
+                $dbType = ucfirst($cfg['adapter']);
 
                 $adapterClass = '\lib\Db\\'.$dbType.'\Adapter';
                 if(!class_exists($adapterClass)) throw new \Exception("DB Adapter not found «{$dbType}»");
