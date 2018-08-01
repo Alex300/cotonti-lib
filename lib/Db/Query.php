@@ -1554,7 +1554,7 @@ class Query extends Component
     }
 
     /**
-     * Execute the query as a "select" statement.
+     * Executes the query and returns a single row of result.
      *
      * @return array
      */

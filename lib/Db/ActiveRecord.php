@@ -1253,12 +1253,13 @@ abstract class ActiveRecord extends Model
     }
 
     /**
-     * Получение единственного значения
+     * Get single result as model
+     *
      * @param array  $conditions
      * @param null   $order
      * @return ActiveRecord
      */
-    public static function fetchOne($conditions = array(), $order = null)
+    public static function fetchOne($conditions = [], $order = null)
     {
         $className = get_called_class();
         $res = static::fetch($conditions, 1, 0, $order);
