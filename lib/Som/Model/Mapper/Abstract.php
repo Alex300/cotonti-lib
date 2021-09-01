@@ -311,7 +311,7 @@ abstract class Som_Model_Mapper_Abstract
      * @throws Exception
      * @return int
      */
-    public final function getCount($table = '', $conditions)
+    public final function getCount($table = '', $conditions = null)
     {
         $tq = $this->tableQuote;
         if (empty($table)){

@@ -5,10 +5,10 @@ Code=cotontilib
 Name=Cotonti Lib
 Description=Additional API for extensions and themes
 Category=development-maintenance
-Version=2.0.3
-Date=2018-01-20
-Author=Kalnov Alexey
-Copyright=(c) 2014-2017 Portal30 Studio http://portal30.ru
+Version=2.0.4
+Date=2021 aug 27
+Author=Kalnov Alexey <kalnovalexey@yandex.ru>
+Copyright=(c) 2014-2021 Lily Software https://lily-software.com (ex. Portal30 Studio)
 Notes=
 Auth_guests=R
 Lock_guests=W12345A
@@ -25,6 +25,6 @@ Lock_members=W12345A
  *
  * @package Cotonti Lib
  * @author  Kalnov Alexey    <kalnovalexey@yandex.ru>
- * @copyright © 2014-2018 Portal30 Studio http://portal30.ru
+ * @copyright © 2014-2021 Lily Software https://lily-software.com (ex. Portal30 Studio)
  */
 defined('COT_CODE') or die('Wrong URL.');
