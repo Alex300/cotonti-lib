@@ -65,31 +65,35 @@ if(!function_exists('mb_lcfirst')) {
  *
  * Todo check if russian settings are right
  */
-function cot_transliterate($string, $transliterator = null)
-{
-    global $cot_translit, $cot_translit_custom, $cot_transliterator;
+if(!function_exists('cot_transliterate')) {
+    function cot_transliterate($string, $transliterator = null)
+    {
+        global $cot_translit, $cot_translit_custom, $cot_transliterator;
 
-    include cot_langfile('translit', 'core');
+        include cot_langfile('translit', 'core');
 
-    if(is_array($cot_translit_custom)) return strtr($string, $cot_translit_custom);
+        if (is_array($cot_translit_custom)) return strtr($string, $cot_translit_custom);
 
-    if (extension_loaded('intl')) {
-        if($transliterator === null) $transliterator = $cot_transliterator;
-        if ($transliterator === null)  $transliterator = 'Any-Latin; Latin-ASCII; [\u0080-\uffff] remove';
+        if (extension_loaded('intl')) {
+            if ($transliterator === null) $transliterator = $cot_transliterator;
+            if ($transliterator === null) $transliterator = 'Any-Latin; Latin-ASCII; [\u0080-\uffff] remove';
 
-        return transliterator_transliterate($transliterator, $string);
+            return transliterator_transliterate($transliterator, $string);
+        }
+
+        if (is_array($cot_translit)) {
+            return strtr($string, $cot_translit);
+        }
+
+        return $string;
     }
-
-    if(is_array($cot_translit)) {
-        return strtr($string, $cot_translit);
-    }
-
-    return $string;
 }
 
-function cot_slug($string)
-{
+if(!function_exists('cot_slug')) {
+    function cot_slug($string)
+    {
 
+    }
 }
 
 /**
@@ -97,15 +101,17 @@ function cot_slug($string)
  *
  * @param mixed $var[,$var1],[.. varN]
  */
-function var_dump_()
-{
-    static $cnt = 0;
-    $cnt++;
-    echo '<div id="var-dump-'.$cnt.'" class="var-dump" style="z-index:1000;opacity:0.8"><pre style="color:black;background-color:white;">';
-    $params = func_get_args();
-    call_user_func_array('var_dump', $params);
-    echo '</pre></div>';
-    ob_flush();
+if (!function_exists('var_dump_')) {
+    function var_dump_()
+    {
+        static $cnt = 0;
+        $cnt++;
+        echo '<div id="var-dump-' . $cnt . '" class="var-dump" style="z-index:1000;opacity:0.8"><pre style="color:black;background-color:white;">';
+        $params = func_get_args();
+        call_user_func_array('var_dump', $params);
+        echo '</pre></div>';
+        ob_flush();
+    }
 }
 
 /**
@@ -113,14 +119,15 @@ function var_dump_()
  *
  * @param mixed $var[,$var1],[.. varN]
  */
-function var_dump__()
-{
-    cot_sendheaders();
-    $params = func_get_args();
-    call_user_func_array('var_dump_', $params);
-    exit;
+if (!function_exists('var_dump__')) {
+    function var_dump__()
+    {
+        cot_sendheaders();
+        $params = func_get_args();
+        call_user_func_array('var_dump_', $params);
+        exit;
+    }
 }
-
 // ==== View template functions ====
 if(!function_exists('cot_formGroupClass')) {
     /**
