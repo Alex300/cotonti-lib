@@ -12,14 +12,20 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
      * @param $dbc
      * @return PDO
      */
-    protected static function connect($dbc) {
+    protected static function connect($dbc)
+    {
         if (empty(Som_Model_Mapper_Abstract::$connections[$dbc])) {
 
             // Connect to DB
-            if($dbc == 'db'){
-                // Default cotonti connection
-                Som_Model_Mapper_Abstract::$connections[$dbc] = cot::$db;
-            }else{
+            if ($dbc == 'db') {
+                // Default Cotonti connection
+                // In Cotonti Siena v. 0.9.21, the CotDb class is not inherited from PDO, but uses it in composition
+                if (method_exists(cot::$db, 'getConnection')) {
+                    Som_Model_Mapper_Abstract::$connections[$dbc] = cot::$db->getConnection();
+                } else {
+                    Som_Model_Mapper_Abstract::$connections[$dbc] = cot::$db;
+                }
+            } else {
                 // Альтернативное соединение из конфига
                 $options = array();
                 if (!empty(cot::$cfg[$dbc]['charset'])) {
