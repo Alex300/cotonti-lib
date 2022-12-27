@@ -556,6 +556,7 @@ abstract class Som_Model_Mapper_Abstract
             }
         }
 
+        $res = 0;
         if (!empty($upd)) {
             $upd = mb_substr($upd, 0, -1);
             $query = "UPDATE {$tq}$table_name{$tq} SET $upd $condition";
@@ -563,8 +564,8 @@ abstract class Som_Model_Mapper_Abstract
                 $stmt = $this->_adapter->prepare($query);
 
                 $this->_bindParams($stmt, $parameters);
-
-                if ($stmt->execute() === false) {
+                $res = $stmt->execute();
+                if ($res === false) {
                     $array = $this->_adapter->errorInfo();
                     throw new Exception('SQL Error: ' . $array[2]);
                 }
