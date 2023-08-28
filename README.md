@@ -1,4 +1,4 @@
-cotonti-lib
+Cotonti lib
 ===========
 
 Cotonti lib library extends CMF cotonti API and provides additional functions to create Cotonti modules and plugins.
