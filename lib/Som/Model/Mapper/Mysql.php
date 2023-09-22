@@ -100,7 +100,7 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
             }
             $queryResult->closeCursor();
         } else {
-            $array = $this->_adapter->errorInfo();
+            $array = $this->adapter->errorInfo();
             throw new Exception('SQL Error: ' . $array[2]);
         }
 
@@ -172,7 +172,7 @@ class Som_Model_Mapper_Mysql extends Som_Model_Mapper_Abstract{
     }
 
     public function lastInsertId($table_name = '', $pkey = ''){
-        return $this->_adapter->lastInsertId();
+        return $this->adapter->lastInsertId();
     }
 
     /**

@@ -28,7 +28,7 @@ abstract class Som_Model_Mapper_Abstract
     /**
      * @var PDO ссылка на объект БД
      */
-    protected $_adapter = null;
+    protected $adapter = null;
 
     /**
      * ExtraFields types to SQL types
@@ -52,11 +52,32 @@ abstract class Som_Model_Mapper_Abstract
     );
 
     /**
+     * Total query count ($_count in CotDb)
+     * @var int
+     */
+    //protected $queryCount = 0;
+    protected $_count = 0;
+
+    /**
+     * Total query execution time in microseconds as string ($_tcount in CotDb)
+     * @var numeric-string
+     */
+    //protected $totalQueryExecutionTime = '0';
+    protected $_tcount = '0';
+
+    /**
+     * Timer start microtime ($_xtime in CotDb)
+     * @var string
+     */
+    //protected $timerStart = '0';
+    protected $_xtime = '0';
+
+    /**
      * @param string $dbc
      * @param array  $dbInfo
      */
     function __construct($dbc = 'db', $dbInfo = array() ){
-        $this->_adapter = static::connect($dbc);
+        $this->adapter = static::connect($dbc);
         $this->_dbinfo = $dbInfo;
     }
 
@@ -193,30 +214,36 @@ abstract class Som_Model_Mapper_Abstract
      * @see http://www.php.net/manual/en/pdo.query.php
      * @see http://www.php.net/manual/en/pdo.prepare.php
      * @param string $query The SQL statement to prepare and execute.
-     * @param array $parameters An array of values to be binded as input parameters to the query. PHP int parameters will beconsidered as PDO::PARAM_INT, others as PDO::PARAM_STR.
+     * @param array $parameters An array of values to be binded as input parameters to the query.
+     *     PHP int parameters will beconsidered as PDO::PARAM_INT, others as PDO::PARAM_STR.
+     * @param int $mode Fetch mode. See https://www.php.net/manual/ru/pdo.constants.php
+     *     In Cotonti we use PDO::FETCH_ASSOC by default to save memory
+     *
      * @return PDOStatement
      * @throws Exception
      */
-    public function query($query, $parameters = array())
+    public function query($query, $parameters = [], $mode = PDO::FETCH_ASSOC)
     {
-
-        if (!is_array($parameters)) $parameters = array($parameters);
+        if (!is_array($parameters)) {
+            $parameters = [$parameters];
+        }
+        $this->startTimer();
 
 //        try
 //        {
         if (count($parameters) > 0) {
-            $result = $this->_adapter->prepare($query);
+            $result = $this->adapter->prepare($query);
             $this->_bindParams($result, $parameters);
 
             if ($result->execute() === false) {
-                $array = $this->_adapter->errorInfo();
+                $array = $this->adapter->errorInfo();
                 throw new Exception('SQL Error: ' . $array[2]);
             }
 
         } else {
-            $result = $this->_adapter->query($query);
+            $result = $this->adapter->query($query);
             if ($result === false) {
-                $array = $this->_adapter->errorInfo();
+                $array = $this->adapter->errorInfo();
                 throw new Exception('SQL Error: ' . $array[2]);
             }
         }
@@ -228,9 +255,13 @@ abstract class Som_Model_Mapper_Abstract
 //                cot_diefatal('SQL error ' . $err_code . ': ' . $err_message);
 //            }
 //        }
-        // We use PDO::FETCH_ASSOC by default to save memory
-        $result->setFetchMode(PDO::FETCH_ASSOC);
-        $this->_affected_rows = $result->rowCount();
+
+        $this->stopTimer($query);
+        if (!empty($result)) {
+            $result->setFetchMode($mode);
+            $this->_affected_rows = $result->rowCount();
+        }
+
         return $result;
     }
 
@@ -287,7 +318,7 @@ abstract class Som_Model_Mapper_Abstract
 
         $res = $this->query($sql, $params);
         if ($res === false) {
-            $array = $this->_adapter->errorInfo();
+            $array = $this->adapter->errorInfo();
             throw new Exception('SQL Error: ' . $array[2]);
         }
         while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
@@ -296,7 +327,7 @@ abstract class Som_Model_Mapper_Abstract
         }
 
         if ($res->closeCursor() === false) {
-            $array = $this->_adapter->errorInfo();
+            $array = $this->adapter->errorInfo();
             throw new Exception('SQL Error: ' . $array[2]);
         }
         return (count($objects) > 0) ? $objects : null;
@@ -330,7 +361,7 @@ abstract class Som_Model_Mapper_Abstract
         $sql = "SELECT COUNT(*) FROM {$tq}$table{$tq}\n $joins\n $where\n";
         $res = $this->query($sql, $params)->fetchColumn();
         if ($res === false) {
-            $array = $this->_adapter->errorInfo();
+            $array = $this->adapter->errorInfo();
             throw new Exception('SQL Error: ' . $array[2]);
         }
         return intval($res);
@@ -429,16 +460,17 @@ abstract class Som_Model_Mapper_Abstract
                     $j++;
                 }
             }
-//            $this->_startTimer();
+
+            $this->startTimer();
             /**
-             * @var PDOStatement $res ;
+             * @var PDOStatement $res
              */
-            $res = $this->_adapter->query($query);
+            $res = $this->adapter->query($query);
             if ($res === false) {
-                $array = $this->_adapter->errorInfo();
+                $array = $this->adapter->errorInfo();
                 throw new Exception('SQL Error: ' . $array[2]);
             }
-//            $this->_stopTimer($query);
+            $this->stopTimer($query);
 
             $id = $this->lastInsertId($table_name, $pkey);
 
@@ -469,7 +501,7 @@ abstract class Som_Model_Mapper_Abstract
      */
     public function lastInsertId($table_name = '', $pkey = '')
     {
-        return $this->_adapter->lastInsertId($table_name, $pkey);
+        return $this->adapter->lastInsertId($table_name, $pkey);
     }
 
     /**
@@ -560,24 +592,27 @@ abstract class Som_Model_Mapper_Abstract
         if (!empty($upd)) {
             $upd = mb_substr($upd, 0, -1);
             $query = "UPDATE {$tq}$table_name{$tq} SET $upd $condition";
+
+            $this->startTimer();
             if (count($parameters) > 0) {
-                $stmt = $this->_adapter->prepare($query);
+                $stmt = $this->adapter->prepare($query);
 
                 $this->_bindParams($stmt, $parameters);
                 $res = $stmt->execute();
                 if ($res === false) {
-                    $array = $this->_adapter->errorInfo();
+                    $array = $this->adapter->errorInfo();
                     throw new Exception('SQL Error: ' . $array[2]);
                 }
 
             } else {
-                $res = $this->_adapter->exec($query);
+                $res = $this->adapter->exec($query);
                 if ($res === false) {
-                    $array = $this->_adapter->errorInfo();
+                    $array = $this->adapter->errorInfo();
                     throw new Exception('SQL Error: ' . $array[2]);
                 }
                 if (empty($res))  return 0;
             }
+            $this->stopTimer($query);
 
             return $res;
         }
@@ -619,21 +654,24 @@ abstract class Som_Model_Mapper_Abstract
         $query = empty($condition) ? "DELETE FROM {$tq}$table_name{$tq}" : "DELETE FROM {$tq}$table_name{$tq} WHERE $condition";
         if (!is_array($parameters)) $parameters = array($parameters);
 
+        $this->startTimer();
         if (count($parameters) > 0) {
-            $stmt = $this->_adapter->prepare($query);
+            $stmt = $this->adapter->prepare($query);
             $this->_bindParams($stmt, $parameters);
             if ($stmt->execute() === false) {
-                $array = $this->_adapter->errorInfo();
+                $array = $this->adapter->errorInfo();
                 throw new Exception('SQL Error: ' . $array[2]);
             }
             $res = $stmt->rowCount();
         } else {
-            $res = $this->_adapter->exec($query);
+            $res = $this->adapter->exec($query);
             if ($res === false) {
-                $array = $this->_adapter->errorInfo();
+                $array = $this->adapter->errorInfo();
                 throw new Exception('SQL Error: ' . $array[2]);
             }
         }
+        $this->stopTimer($query);
+
         return $res;
     }
 
@@ -667,21 +705,17 @@ abstract class Som_Model_Mapper_Abstract
      * @return bool
      * @throws Exception
      */
-    protected function incdec($tablename, $pairs, $conditions = '', $inc = true) {
+    protected function incdec($tablename, $pairs, $conditions = '', $inc = true)
+    {
         if (!empty($pairs)) {
             $conditions = empty($conditions) ? '' : 'WHERE ' . $conditions;
-            $pairupd   = array();
+            $pairupd = [];
             foreach ($pairs as $field => $val) {
                 $pairupd [] = " $field = $field " . ($inc ? '+ ' : '- ') . $val;
             }
-            $upd   = implode(',', $pairupd);
-            $query = "UPDATE ".static::quoteIdentifier($tablename)." SET $upd $conditions";
-            $res   = $this->_adapter->exec($query);
-            if ($res === false) {
-                $array = $this->_adapter->errorInfo();
-                throw new Exception('SQL Error: ' . $array[2]);
-            }
-
+            $upd = implode(',', $pairupd);
+            $query = "UPDATE " . static::quoteIdentifier($tablename) . " SET $upd $conditions";
+            $res = $this->query($query);
             return true;
         }
         return false;
@@ -734,17 +768,13 @@ abstract class Som_Model_Mapper_Abstract
                 // хз пока, все зависит от типа
                 $defenition .= " DEFAULT NULL";
             } elseif (!empty($field['default'])) {
-                $defenition .= " DEFAULT " . $this->_adapter->quote($field['default']);
+                $defenition .= " DEFAULT " . $this->adapter->quote($field['default']);
             }
         }
         $sql = "ALTER TABLE {$tq}{$table}{$tq} ADD COLUMN {$field['name']} $defenition";
-        $res = $this->_adapter->query($sql);
-        if ($res === false) {
-            $array = $this->_adapter->errorInfo();
-            throw new Exception('SQL Error: ' . $array[2]);
-        }
+        $res = $this->query($sql);
 
-        return $res;
+        return true;
     }
 
     /**
@@ -955,12 +985,12 @@ abstract class Som_Model_Mapper_Abstract
      */
     public function quote($data)
     {
-        if (is_string($data)) return $this->_adapter->quote($data);
+        if (is_string($data)) return $this->adapter->quote($data);
 
         if (!is_array($data)) return $data;
 
         foreach ($data as $key => $str) {
-            if (!(strval(intval($data[$key])) == $data[$key])) $data[$key] = $this->_adapter->quote($str);
+            if (!(strval(intval($data[$key])) == $data[$key])) $data[$key] = $this->adapter->quote($str);
         }
 
         return $data;
@@ -1002,7 +1032,7 @@ abstract class Som_Model_Mapper_Abstract
             $type = is_int($val) ? PDO::PARAM_INT : PDO::PARAM_STR;
             $is_numeric ? $statement->bindValue($key + 1, $val, $type) : $statement->bindValue($key, $val, $type);
             if ($statement === false) {
-                $array = $this->_adapter->errorInfo();
+                $array = $this->adapter->errorInfo();
                 throw new Exception('SQL Error: ' . $array[2]);
             }
         }
@@ -1198,7 +1228,7 @@ abstract class Som_Model_Mapper_Abstract
                 $res = $this->insert($xRefTable, $upData);
 
                 if ($res === false) {
-                    $error = $this->_adapter->errorInfo();
+                    $error = $this->adapter->errorInfo();
                     throw new Exception("SQL Error {$error[0]}: {$error[2]}");
                 };
             }
@@ -1292,4 +1322,54 @@ abstract class Som_Model_Mapper_Abstract
         return $this->_dbinfo;
     }
 
+    /**
+     * Starts query execution timer
+     */
+    protected function startTimer()
+    {
+        // if config is not loaded yet, save stats just in case
+        $showStats = !isset(\Cot::$cfg['showsqlstats']) || \Cot::$cfg['showsqlstats'];
+
+        $this->_count++;
+        if ($showStats || \Cot::$cfg['debug_mode']) {
+            $this->_xtime = microtime();
+        }
+    }
+
+    /**
+     * Stops query execution timer
+     */
+    private function stopTimer($query)
+    {
+        // if config is not loaded yet, save stats just in case
+        $showStats = !isset(\Cot::$cfg['showsqlstats']) || \Cot::$cfg['showsqlstats'];
+        $devMode = !isset(\Cot::$cfg['devmode']) || \Cot::$cfg['devmode'];
+
+        if ($showStats || \Cot::$cfg['debug_mode']) {
+            $now = microtime();
+            $xtime = explode(' ', $this->_xtime);
+            $ytime = explode(' ', $now);
+
+            $startTime = bcadd($xtime[1], $xtime[0], 8);
+            $stopTime = bcadd($ytime[1], $ytime[0], 8);
+            $executionTime = bcsub($stopTime, $startTime, 8);
+
+            $this->_tcount = bcadd($this->_tcount, $executionTime, 8);
+            if ($devMode || \Cot::$cfg['debug_mode']) {
+                $calls = '';
+                $bt = debug_backtrace();
+                for ($i = sizeof($bt) - 1; $i > 0; $i--) {
+                    $object = !empty($bt[$i]['object']);
+                    $call = (($object && $bt[$i]['class']) ? $bt[$i]['class'] . $bt[$i]['type'] : '') . $bt[$i]['function'] . '();';
+                    $calls .= (empty($calls) ? '' : "\n → ")
+                        . (!empty($bt[$i]['file']) ? basename($bt[$i]['file']) : '-')
+                        . ' [' . (!empty($bt[$i]['line']) ? $bt[$i]['line'] : '-') . ']: '
+                        . $call;
+                }
+
+                \Cot::$sys['devmode']['queries'][] = [$this->_count, $executionTime, $query, $calls];
+                \Cot::$sys['devmode']['timeline'][] = bcsub($startTime, \Cot::$sys['starttime'], 8);
+            }
+        }
+    }
 }

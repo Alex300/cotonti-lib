@@ -7,7 +7,7 @@
 class Som_Model_Mapper_Mongo extends Som_Model_Mapper_Abstract 
 {
 
-    protected $_adapter = null;
+    protected $adapter = null;
     protected $_dbinfo = null;
 
     function __construct($dbinfo) {
@@ -15,12 +15,12 @@ class Som_Model_Mapper_Mongo extends Som_Model_Mapper_Abstract
 
         $conn           = new Mongo();
         $name_db        = isset($dbinfo['dbname'])?$dbinfo['dbname']:SHOP_SHORTNAME;
-        $this->_adapter = $conn->$name_db;
+        $this->adapter = $conn->$name_db;
     }
 
     protected function _getCollection() {
         $collectionName = $this->_dbinfo['tbname'];
-        return $this->_adapter->$collectionName;
+        return $this->adapter->$collectionName;
     }
 
     /**

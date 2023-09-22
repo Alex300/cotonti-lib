@@ -164,7 +164,7 @@ AND x.indisprimary
         }
         if(empty($pkey)) return null;
 
-        return $this->_adapter->lastInsertId("{$table_name}_{$pkey}_seq");
+        return $this->adapter->lastInsertId("{$table_name}_{$pkey}_seq");
     }
 
     /**
@@ -193,7 +193,7 @@ AND x.indisprimary
 
         $res = $this->query("SELECT 1 FROM pg_catalog.pg_class WHERE relkind = 'r' AND relname = ? AND pg_catalog.pg_table_is_visible(oid) LIMIT 1", $table)->fetchAll();
         if ($res === false) {
-            $array = $this->_adapter->errorInfo();
+            $array = $this->adapter->errorInfo();
             throw new Exception('SQL Error: ' . $array[2]);
         }
         return !empty($res);
@@ -224,9 +224,9 @@ AND x.indisprimary
                     CONSTRAINT {$tq}{$table}_pkey{$tq} PRIMARY KEY ({$tq}{$pKey}{$tq})
                )";
 
-        $res = $this->_adapter->query($sql);
+        $res = $this->adapter->query($sql);
         if ($res === false) {
-            $array = $this->_adapter->errorInfo();
+            $array = $this->adapter->errorInfo();
             throw new Exception('SQL Error: ' . $array[2]);
         }
         if(is_array($fields)){
@@ -261,7 +261,7 @@ AND x.indisprimary
         if(is_string($new)) $new = array('name'=>$new);
 
         if(!$this->fieldExist($old['name'])) return false;
-        $adapter = $this->_adapter->getConnection();
+        $adapter = $this->adapter->getConnection();
 
         // To change column a from INTEGER to TINYINT NOT NULL
         // ALTER TABLE t2 MODIFY a TINYINT NOT NULL
@@ -275,14 +275,14 @@ AND x.indisprimary
                 // хз пока, все зависит от типа
                 //$defenition .= " DEFAULT NULL";
             }elseif(!empty($old['default'])){
-                $defenition .= " DEFAULT ".$this->_adapter->quote($old['default']);
+                $defenition .= " DEFAULT ".$this->adapter->quote($old['default']);
             }
 
             $sql = "ALTER TABLE `{$this->_dbinfo['tbname']}` MODIFY {$old['name']} $defenition";
 
             $res = $adapter->query($sql);
             if ($res === false) {
-                $array = $this->_adapter->errorInfo();
+                $array = $this->adapter->errorInfo();
                 throw new Exception('SQL Error: ' . $array[2]);
             }
             return $res;
@@ -316,7 +316,7 @@ AND x.indisprimary
             // хз пока, все зависит от типа
             //$defenition .= " DEFAULT NULL";
         }elseif(!empty($new['default'])){
-            $defenition .= " DEFAULT ".$this->_adapter->quote($new['default']);
+            $defenition .= " DEFAULT ".$this->adapter->quote($new['default']);
         }
 
         $sql = "ALTER TABLE `{$this->_dbinfo['tbname']}` CHANGE {$old['name']} {$new['name']} $defenition";
@@ -331,7 +331,7 @@ AND x.indisprimary
         die('move "deleteField" to postgres');
 
         if(!$this->fieldExists($field)) return false;
-        $adapter = $this->_adapter->getConnection();
+        $adapter = $this->adapter->getConnection();
         $adapter->query("ALTER TABLE `{$this->_dbinfo['tbname']}` DROP $field");
     }
 
@@ -359,9 +359,9 @@ AND x.indisprimary
         if(empty($newtablename)) $newtablename = 'renamed_'. $this->_dbinfo['tbname'] ;
         $sql = 'ALTER TABLE "'. $tablename . '" RENAME TO "'.$newtablename.'"';
 
-        $res = $this->_adapter->query($sql);
+        $res = $this->adapter->query($sql);
         if ($res === false) {
-            $array = $this->_adapter->errorInfo();
+            $array = $this->adapter->errorInfo();
             throw new Exception('SQL Error: ' . $array[2]);
         }
         return $res;
