@@ -1,4 +1,8 @@
 <?php
+
+use exception\InvalidCallException;
+use exception\UnknownPropertyException;
+
 /**
  * Model is the base class for data models.
  *
@@ -119,8 +123,8 @@ abstract class Som_Model_Abstract extends Component
      * will be implicitly called when executing `$value = $component->property;`.
      * @param string $name the property name
      * @return mixed the property value or the value of a behavior's property
-     * @throws Exception_UnknownProperty if the property is not defined
-     * @throws Exception_InvalidCall if the property is write-only.
+     * @throws UnknownPropertyException if the property is not defined
+     * @throws InvalidCallException if the property is write-only.
      * @see __set()
      */
     public function __get($name)
@@ -237,7 +241,7 @@ abstract class Som_Model_Abstract extends Component
      * Do not call this method directly as it is a PHP magic method that
      * will be implicitly called when executing `unset($component->property)`.
      * @param string $name the property name
-     * @throws Exception_InvalidCall if the property is read only.
+     * @throws InvalidCallException if the property is read only.
      * @see http://php.net/manual/en/function.unset.php
      */
     public function __unset($name)
@@ -272,7 +276,7 @@ abstract class Som_Model_Abstract extends Component
             return;
         }
 
-        throw new Exception_InvalidCall('Unsetting an unknown or read-only property: ' . get_class($this) . '::' . $name);
+        throw new InvalidCallException('Unsetting an unknown or read-only property: ' . get_class($this) . '::' . $name);
     }
 
     protected function beforeSetData(&$data)
