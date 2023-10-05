@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace exception;
+namespace exceptions;
 
 use Exception;
 

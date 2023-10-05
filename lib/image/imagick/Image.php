@@ -3,8 +3,8 @@
 namespace image\imagick;
 
 use image\AbstractImage;
-use image\exception\InvalidArgumentException;
-use image\exception\RuntimeException;
+use image\exceptions\InvalidArgumentException;
+use image\exceptions\RuntimeException;
 
 /**
  * Image implementation using the Imagick PHP extension.

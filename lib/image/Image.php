@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace image;
 
-use image\exception\ImageException;
-use image\exception\NotSupportedException;
+use image\exceptions\ImageException;
+use image\exceptions\NotSupportedException;
 
 /**
  * Image service. Factory and config

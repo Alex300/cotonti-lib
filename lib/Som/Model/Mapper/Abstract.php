@@ -364,7 +364,7 @@ abstract class Som_Model_Mapper_Abstract
             $array = $this->adapter->errorInfo();
             throw new Exception('SQL Error: ' . $array[2]);
         }
-        return intval($res);
+        return (int) $res;
     }
 
     /**

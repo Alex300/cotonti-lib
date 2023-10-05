@@ -3,7 +3,7 @@
 namespace image\gd;
 
 use image\AbstractEncoder;
-use image\exception\NotSupportedException;
+use image\exceptions\NotSupportedException;
 use image\Format;
 
 class Encoder extends AbstractEncoder

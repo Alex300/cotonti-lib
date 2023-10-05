@@ -3,8 +3,8 @@
 namespace image\gd;
 
 use image\AbstractDecoder;
-use image\exception\NotReadableException;
-use image\exception\NotSupportedException;
+use image\exceptions\NotReadableException;
+use image\exceptions\NotSupportedException;
 
 class Decoder extends AbstractDecoder
 {

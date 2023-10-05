@@ -3,8 +3,8 @@
 namespace image\imagick;
 
 use image\AbstractDecoder;
-use image\exception\NotReadableException;
-use image\exception\NotSupportedException;
+use image\exceptions\NotReadableException;
+use image\exceptions\NotSupportedException;
 use image\Format;
 
 class Decoder extends AbstractDecoder
@@ -38,7 +38,9 @@ class Decoder extends AbstractDecoder
 
             // Imagick PHP extension does not work with relative paths on Windows
             if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-                $core->readImageBlob(file_get_contents($path));
+                $handle = fopen($path, 'rb');
+                $core->readImageFile($handle);
+                fclose($handle);
             } else {
                 $core->readImage($path);
             }
@@ -136,6 +138,38 @@ class Decoder extends AbstractDecoder
 
         $result = $this->loadFromImagick($core);
         $result['mime'] = finfo_buffer(finfo_open(FILEINFO_MIME_TYPE), $binary);
+
+        return $result;
+    }
+
+    /**
+     * Init from given stream
+     * @param resource $stream
+     * @return array{
+     *     data: resource|\Imagick|\GdImage,
+     *     mime: string,
+     *     format: string,
+     *     orientation: string,
+     * }
+     */
+    public function loadFromStream($resource)
+    {
+        if (ftell($resource) !== 0 && stream_get_meta_data($resource)['seekable']) {
+            rewind($resource);
+        }
+        $core = new \Imagick;
+        try {
+            $core->setBackgroundColor(new \ImagickPixel('transparent'));
+            $core->readImageFile($resource);
+            $core->setImageType(\Imagick::IMGTYPE_TRUECOLORMATTE);
+
+        } catch (\ImagickException $e) {
+            throw new NotReadableException(
+                "Unable to init from given stream"
+            );
+        }
+
+        $result = $this->loadFromImagick($core);
 
         return $result;
     }

@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace image;
 
-use image\exception\NotReadableException;
+use image\exceptions\NotReadableException;
 
 abstract class AbstractDecoder
 {
@@ -296,41 +298,21 @@ abstract class AbstractDecoder
     }
 
     /**
-     * Init from given stream
-     * @param StreamInterface|resource $stream
+     * Init from given stream.
+     * @param resource $stream
      * @return array{
      *     data: resource|\Imagick|\GdImage,
      *     mime: string,
      *     format: string
      * }
      */
-    public function loadFromStream($stream)
+    public function loadFromStream($resource)
     {
-//        if (!$stream instanceof StreamInterface) {
-//            $stream = new Stream($stream);
-//        }
-        try {
-            $offset = $stream->tell();
-        } catch (\RuntimeException $e) {
-            $offset = 0;
+        if (ftell($resource) !== 0 && stream_get_meta_data($resource)['seekable']) {
+            rewind($resource);
         }
 
-        $shouldAndCanSeek = $offset !== 0 && $stream->isSeekable();
-
-        if ($shouldAndCanSeek) {
-            $stream->rewind();
-        }
-
-        try {
-            $data = $stream->getContents();
-        } catch (\RuntimeException $e) {
-            $data = null;
-        }
-
-        if ($shouldAndCanSeek) {
-            $stream->seek($offset);
-        }
-
+        $data = stream_get_contents($resource);
         if ($data) {
             return $this->loadFromBinary($data);
         }

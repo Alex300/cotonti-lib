@@ -3,8 +3,8 @@
 namespace image\gd;
 
 use image\AbstractImage;
-use image\exception\InvalidArgumentException;
-use image\exception\RuntimeException;
+use image\exceptions\InvalidArgumentException;
+use image\exceptions\RuntimeException;
 
 /**
  * Imagine implementation using the GD library.

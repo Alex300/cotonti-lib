@@ -5,9 +5,9 @@
  * @license http://www.yiiframework.com/license/
  */
 
-use exception\InvalidCallException;
-use exception\UnknownMethodException;
-use exception\UnknownPropertyException;
+use exceptions\InvalidCallException;
+use exceptions\UnknownMethodException;
+use exceptions\UnknownPropertyException;
 
 /**
  * Object is the base class that implements the *property* feature.

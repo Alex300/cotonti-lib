@@ -1,7 +1,7 @@
 <?php
 
-use exception\InvalidCallException;
-use exception\UnknownPropertyException;
+use exceptions\InvalidCallException;
+use exceptions\UnknownPropertyException;
 
 /**
  * Model is the base class for data models.

@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace image;
 
-use image\exception\InvalidArgumentException;
+use image\exceptions\InvalidArgumentException;
 
 abstract class AbstractEncoder
 {

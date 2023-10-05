@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace image;
 
-use image\exception\InvalidArgumentException;
-use image\exception\NotWritableException;
+use image\exceptions\InvalidArgumentException;
+use image\exceptions\NotWritableException;
 
 /**
  * @todo Gamma correction, filters,
@@ -157,12 +159,12 @@ abstract class AbstractImage
 
     /**
      * Saves encoded image in filesystem
-     * @param string $fileName
-     * @param int $quality
-     * @param string $format
+     * @param ?string $fileName
+     * @param ?int $quality
+     * @param ?string $format
      * @return self
      */
-    public function save($fileName = null, $quality = null, $format = null)
+    public function save(?string $fileName = null, ?int $quality = null, ?string $format = null): self
     {
         $fileName = $fileName === null ? $this->fileFullName() : $fileName;
         if (is_null($fileName)) {
