@@ -383,17 +383,17 @@ abstract class AbstractImage
      * @param string $filter
      * @return self
      */
-    public function resize($width = null, $height = null, $filter = Image::FILTER_UNDEFINED)
+    public function resize($width = null, $height = null, $filter = Image::FILTER_UNDEFINED): self
     {
         $originalWidth = $this->getWidth();
         $originalHeight = $this->getHeight();
 
-        $width = (!empty($width) && mb_substr($width, -1, 1) == '%')
-            ? (int) ($originalWidth * (int) mb_substr($width, 0, -1) / 100)
+        $width = (!empty($width) && mb_substr((string) $width, -1, 1) == '%')
+            ? (int) ($originalWidth * (int) mb_substr((string) $width, 0, -1) / 100)
             : (int) $width;
 
-        $height = (!empty($height) && mb_substr($height, -1, 1) == '%')
-            ? (int) ($originalHeight * (int) mb_substr($height, 0, -1) / 100)
+        $height = (!empty($height) && mb_substr((string) $height, -1, 1) == '%')
+            ? (int) ($originalHeight * (int) mb_substr((string) $height, 0, -1) / 100)
             : (int) $height;
 
         if ($width === 0 && $height === 0) {
@@ -436,17 +436,22 @@ abstract class AbstractImage
      * @param string $filter
      * @return self
      */
-    public function thumbnail($width, $height, $resize = Image::THUMBNAIL_OUTBOUND, $upscale = false, $filter = Image::FILTER_LANCZOS)
-    {
+    public function thumbnail(
+        $width,
+        $height,
+        string $resize = Image::THUMBNAIL_OUTBOUND,
+        bool $upscale = false,
+        string $filter = Image::FILTER_LANCZOS
+    ): self {
         $imageWidth = $this->getWidth();
         $imageHeight = $this->getHeight();
 
-        $width = (!empty($width) && mb_substr($width, -1, 1) == '%')
-            ? (int) ($imageWidth * (int) mb_substr($width, 0, -1) / 100)
+        $width = (!empty($width) && mb_substr((string) $width, -1, 1) == '%')
+            ? (int) ($imageWidth * (int) mb_substr((string) $width, 0, -1) / 100)
             : (int) $width;
 
-        $height = (!empty($height) && mb_substr($height, -1, 1) == '%')
-            ? (int) ($imageHeight * (int) mb_substr($height, 0, -1) / 100)
+        $height = (!empty($height) && mb_substr((string) $height, -1, 1) == '%')
+            ? (int) ($imageHeight * (int) mb_substr((string) $height, 0, -1) / 100)
             : (int) $height;
 
         if ($width === 0 && $height === 0) {

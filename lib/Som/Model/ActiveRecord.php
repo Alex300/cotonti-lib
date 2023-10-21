@@ -944,14 +944,16 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
     {
         $className = get_called_class();
 
-        if (!$this->validateDelete() || !$this->beforeDelete()) return false;
+        if (!$this->validateDelete() || !$this->beforeDelete()) {
+            return false;
+        }
 
-        if(!empty($cot_extrafields[static::$_tbname])) {
+        if (!empty($cot_extrafields[static::$_tbname])) {
             // Не очень хорошее решение, но в Cotonti имена полей хранятся без префиска.
             $column_prefix = substr(static::$_primary_key, 0, strpos(static::$_primary_key, "_"));
             $column_prefix = (!empty($column_prefix)) ? $column_prefix . '_' : '';
 
-            foreach($cot_extrafields[static::$_tbname] as $key => $field) {
+            foreach ($cot_extrafields[static::$_tbname] as $key => $field) {
                 cot_extrafield_unlinkfiles($this->_data[$column_prefix.$field['field_name']], $field);
             }
         }
@@ -964,19 +966,19 @@ abstract class Som_Model_ActiveRecord extends Som_Model_Abstract
         $this->_data[static::primaryKey()] = null;
 
         // Free resources
-        if(!empty($this->_extraData)) {
+        if (!empty($this->_extraData)) {
             foreach ($this->_extraData as $key => $val) {
                 unset($this->_extraData[$key]);
             }
         }
 
-        if(!empty($this->_data)) {
+        if (!empty($this->_data)) {
             foreach ($this->_data as $key => $val) {
                 unset($this->_data[$key]);
             }
         }
 
-        if(!empty($this->_oldData)) {
+        if (!empty($this->_oldData)) {
             foreach ($this->_oldData as $key => $val) {
                 unset($this->_oldData[$key]);
             }

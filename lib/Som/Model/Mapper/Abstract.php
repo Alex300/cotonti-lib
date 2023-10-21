@@ -1328,10 +1328,10 @@ abstract class Som_Model_Mapper_Abstract
     protected function startTimer()
     {
         // if config is not loaded yet, save stats just in case
-        $showStats = !isset(\Cot::$cfg['showsqlstats']) || \Cot::$cfg['showsqlstats'];
+        $showStats = !isset(Cot::$cfg['showsqlstats']) || Cot::$cfg['showsqlstats'];
 
         $this->_count++;
-        if ($showStats || \Cot::$cfg['debug_mode']) {
+        if ($showStats || Cot::$cfg['debug_mode']) {
             $this->_xtime = microtime();
         }
     }
@@ -1342,10 +1342,10 @@ abstract class Som_Model_Mapper_Abstract
     private function stopTimer($query)
     {
         // if config is not loaded yet, save stats just in case
-        $showStats = !isset(\Cot::$cfg['showsqlstats']) || \Cot::$cfg['showsqlstats'];
-        $devMode = !isset(\Cot::$cfg['devmode']) || \Cot::$cfg['devmode'];
+        $showStats = !isset(Cot::$cfg['showsqlstats']) || Cot::$cfg['showsqlstats'];
+        $devMode = !isset(Cot::$cfg['devmode']) || Cot::$cfg['devmode'];
 
-        if ($showStats || \Cot::$cfg['debug_mode']) {
+        if ($showStats || Cot::$cfg['debug_mode']) {
             $now = microtime();
             $xtime = explode(' ', $this->_xtime);
             $ytime = explode(' ', $now);
@@ -1355,7 +1355,7 @@ abstract class Som_Model_Mapper_Abstract
             $executionTime = bcsub($stopTime, $startTime, 8);
 
             $this->_tcount = bcadd($this->_tcount, $executionTime, 8);
-            if ($devMode || \Cot::$cfg['debug_mode']) {
+            if ($devMode || Cot::$cfg['debug_mode']) {
                 $calls = '';
                 $bt = debug_backtrace();
                 for ($i = sizeof($bt) - 1; $i > 0; $i--) {
@@ -1367,8 +1367,8 @@ abstract class Som_Model_Mapper_Abstract
                         . $call;
                 }
 
-                \Cot::$sys['devmode']['queries'][] = [$this->_count, $executionTime, $query, $calls];
-                \Cot::$sys['devmode']['timeline'][] = bcsub($startTime, \Cot::$sys['starttime'], 8);
+                Cot::$sys['devmode']['queries'][] = [$this->_count, $executionTime, $query, $calls];
+                Cot::$sys['devmode']['timeline'][] = bcsub($startTime, Cot::$sys['starttime'], 8);
             }
         }
     }

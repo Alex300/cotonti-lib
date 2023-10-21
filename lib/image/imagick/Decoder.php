@@ -146,7 +146,7 @@ class Decoder extends AbstractDecoder
      * Init from given stream
      * @param resource $stream
      * @return array{
-     *     data: resource|\Imagick|\GdImage,
+     *     data: \Imagick|,
      *     mime: string,
      *     format: string,
      *     orientation: string,
@@ -164,9 +164,9 @@ class Decoder extends AbstractDecoder
             $core->setImageType(\Imagick::IMGTYPE_TRUECOLORMATTE);
 
         } catch (\ImagickException $e) {
-            throw new NotReadableException(
-                "Unable to init from given stream"
-            );
+            // Unable to read image from the filehandle
+            // Try load another way:
+            return parent::loadFromStream($resource);
         }
 
         $result = $this->loadFromImagick($core);

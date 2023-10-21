@@ -5,20 +5,29 @@ declare(strict_types=1);
 namespace filesystem;
 
 use Cot;
+use DateTimeInterface;
+use DirectoryIterator;
 use filesystem\exceptions\InvalidStreamProvided;
+use filesystem\exceptions\InvalidVisibilityProvided;
+use filesystem\exceptions\SymbolicLinkEncountered;
+use filesystem\exceptions\UnableToCopyFile;
 use filesystem\exceptions\UnableToCreateDirectory;
 use filesystem\exceptions\UnableToDeleteDirectory;
 use filesystem\exceptions\UnableToDeleteFile;
+use filesystem\exceptions\UnableToGenerateTemporaryUrl;
+use filesystem\exceptions\UnableToListContents;
 use filesystem\exceptions\UnableToMoveFile;
+use filesystem\exceptions\UnableToProvideChecksum;
 use filesystem\exceptions\UnableToReadFile;
 use filesystem\exceptions\UnableToRetrieveMetadata;
 use filesystem\exceptions\UnableToSetVisibility;
 use filesystem\exceptions\UnableToWriteFile;
 use FilesystemIterator;
+use Generator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
-use Traversable;
+use Throwable;
 
 /**
  * Локальная файловая система
@@ -28,17 +37,38 @@ use Traversable;
  */
 class LocalFilesystem
 {
+    public const OPTION_VISIBILITY = 'visibility';
+    public const OPTION_DIRECTORY_VISIBILITY = 'directory_visibility';
+
     public const LIST_SHALLOW = false;
     public const LIST_DEEP = true;
+
+    /**
+     * @var int
+     */
+    public const SKIP_LINKS = 0001;
+
+    /**
+     * @var int
+     */
+    public const DISALLOW_LINKS = 0002;
 
     //private Config $config;
     //private PathNormalizer $pathNormalizer;
 
     protected string $rootDirectory = '';
 
-    protected ?int $directoryPermissions = null;
+    private int $filePublic = 0644;
+    private int $filePrivate = 0600;
+    private int $directoryPublic = 0755;
+    private int $directoryPrivate = 0700;
+
+    //private string $defaultDirectoryVisibility = StorageAttributes::VISIBILITY_PRIVATE;
+    private string $defaultDirectoryVisibility = StorageAttributes::VISIBILITY_PUBLIC;
 
     protected string $baseUrl = '';
+
+    private int $linkHandling = self::DISALLOW_LINKS;
 
     public function __construct(
         string $rootDirectory = ''
@@ -56,7 +86,11 @@ class LocalFilesystem
         /** @todo файлы могут грузиться за пределы вебсервера */
         $this->baseUrl = rtrim($this->rootDirectory, '/') . '/';
 
-        $this->directoryPermissions = Cot::$cfg['dir_perms'];
+//        $this->directoryPermissions = Cot::$cfg['dir_perms'];
+//        $this->filePermissions = Cot::$cfg['file_perms'];
+
+        $this->filePublic = Cot::$cfg['file_perms'];
+        $this->directoryPublic = Cot::$cfg['dir_perms'];
 
 //        $this->config = new Config($config);
 //        $this->pathNormalizer = $pathNormalizer ?: new WhitespacePathNormalizer();
@@ -168,19 +202,6 @@ class LocalFilesystem
             return;
         }
 
-//        $objects = scandir($prefixedLocation);
-//        foreach ($objects as $object) {
-//            if ($object != '.' && $object != '..') {
-//                if (filetype($prefixedLocation . '/' . $object) === 'dir') {
-//                    $this->deleteDirectory($prefixedLocation . '/' . $object);
-//                } else {
-//                    unlink($prefixedLocation . '/' . $object);
-//                }
-//            }
-//        }
-//        reset($objects);
-//        rmdir($prefixedLocation);
-
         $contents = $this->listDirectoryRecursively($prefixedLocation, RecursiveIteratorIterator::CHILD_FIRST);
         /** @var SplFileInfo $file */
         foreach ($contents as $file) {
@@ -198,7 +219,15 @@ class LocalFilesystem
     public function createDirectory(string $location, array $config = []): void
     {
         $prefixedLocation = $this->prefixPath($this->normalizePath($location));
-        $permissions = $this->directoryPermissions;
+
+        $visibility = null;
+        if (isset($config[static::OPTION_VISIBILITY])) {
+            $visibility = $config[static::OPTION_VISIBILITY];
+        } elseif (isset($config[static::OPTION_DIRECTORY_VISIBILITY])) {
+            $visibility = $config[static::OPTION_DIRECTORY_VISIBILITY];
+        }
+        $visibility = $visibility ?? $this->defaultDirectoryVisibility;
+        $permissions = $this->directoryVisibilityToPermissions($visibility);
 
         if (is_dir($prefixedLocation)) {
             $this->setPermissions($prefixedLocation, $permissions);
@@ -207,7 +236,7 @@ class LocalFilesystem
 
         error_clear_last();
 
-        if (!@mkdir($location, $permissions, true)) {
+        if (!@mkdir($prefixedLocation, $permissions, true)) {
             throw UnableToCreateDirectory::atLocation($prefixedLocation, error_get_last()['message'] ?? '');
         }
     }
@@ -216,17 +245,82 @@ class LocalFilesystem
      * Listing directory contents
      * @param string $location Location of a directory
      * @param bool $deep Recursive or not (default false)
-     * @todo
+     * @return DirectoryListing<StorageAttributes>
      */
-    public function listContents(string $location, bool $deep = self::LIST_SHALLOW)
+    public function listContents(string $location, bool $deep = self::LIST_SHALLOW): ?DirectoryListing
     {
-//        $path = $this->pathNormalizer->normalizePath($location);
-//        $listing = $this->adapter->listContents($path, $deep);
-
-
+        $listing = $this->listDirectoryContents($location, $deep);
+        return new DirectoryListing($this->pipeListing($location, $deep, $listing));
     }
 
-    private function pipeListing(string $location, bool $deep, iterable $listing)
+    private function listDirectoryContents(string $location, bool $deep): iterable
+    {
+        $path = $this->prefixPath($this->normalizePath($location));
+
+        if (!is_dir($path)) {
+            return;
+        }
+
+        /** @var SplFileInfo[] $iterator */
+        $iterator = $deep ? $this->listDirectoryRecursively($path) : $this->listDirectory($path);
+
+        foreach ($iterator as $fileInfo) {
+            $pathName = $fileInfo->getPathname();
+
+            try {
+                if ($fileInfo->isLink()) {
+                    if ($this->linkHandling & self::SKIP_LINKS) {
+                        continue;
+                    }
+                    throw SymbolicLinkEncountered::atLocation($pathName);
+                }
+
+                $path = $this->stripPathPrefix($pathName);
+                $lastModified = $fileInfo->getMTime();
+                $isDirectory = $fileInfo->isDir();
+                $permissions = octdec(substr(sprintf('%o', $fileInfo->getPerms()), -4));
+                $visibility = $isDirectory ? $this->directoryPermissionsToVisibility($permissions) : $this->filePermissionsToVisibility($permissions);
+
+                yield $isDirectory
+                    ? new DirectoryAttributes(str_replace('\\', '/', $path), $visibility, $lastModified)
+                    : new FileAttributes(
+                        str_replace('\\', '/', $path),
+                        $fileInfo->getSize(),
+                        $visibility,
+                        $lastModified
+                    );
+            } catch (Throwable $exception) {
+                if (file_exists($pathName)) {
+                    throw $exception;
+                }
+            }
+        }
+    }
+
+    private function listDirectory(string $location): Generator
+    {
+        $iterator = new DirectoryIterator($location);
+        foreach ($iterator as $item) {
+            if ($item->isDot()) {
+                continue;
+            }
+
+            yield $item;
+        }
+    }
+
+    private function listDirectoryRecursively(string $path, int $mode = RecursiveIteratorIterator::SELF_FIRST): Generator
+    {
+        if (!is_dir($path)) {
+            return;
+        }
+        yield from new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
+            $mode
+        );
+    }
+
+    private function pipeListing(string $location, bool $deep, iterable $listing): Generator
     {
         try {
             foreach ($listing as $item) {
@@ -249,7 +343,10 @@ class LocalFilesystem
         $sourcePath = $this->prefixPath($this->normalizePath($source));
         $destinationPath = $this->prefixPath($this->normalizePath($destination));
 
-        $this->ensureDirectoryExists(dirname($destinationPath), $config['visibility'] ?? null);
+        $visibility = $config[static::OPTION_DIRECTORY_VISIBILITY] ?? $this->defaultDirectoryVisibility;
+        $permissions = $this->directoryVisibilityToPermissions($visibility);
+
+        $this->ensureDirectoryExists(dirname($destinationPath), $permissions);
 
         if (!@rename($sourcePath, $destinationPath)) {
             throw UnableToMoveFile::fromLocationTo($sourcePath, $destinationPath);
@@ -258,11 +355,21 @@ class LocalFilesystem
 
     public function copy(string $source, string $destination, array $config = []): void
     {
-        $this->adapter->copy(
-            $this->pathNormalizer->normalizePath($source),
-            $this->pathNormalizer->normalizePath($destination),
-            $this->config->extend($config)
-        );
+        $sourcePath = $this->prefixPath($this->normalizePath($source));
+        $destinationPath = $this->prefixPath($this->normalizePath($destination));
+
+        if ($sourcePath === $destinationPath) {
+            throw UnableToCopyFile::sourceAndDestinationAreTheSame($source, $destination);
+        }
+
+        $visibility = $config[static::OPTION_DIRECTORY_VISIBILITY] ?? $this->defaultDirectoryVisibility;
+        $permissions = $this->directoryVisibilityToPermissions($visibility);
+
+        $this->ensureDirectoryExists(dirname($destinationPath), $permissions);
+
+        if (!@copy($sourcePath, $destinationPath)) {
+            throw UnableToCopyFile::because(error_get_last()['message'] ?? 'unknown', $source, $destination);
+        }
     }
 
     public function lastModified(string $path): int
@@ -280,22 +387,59 @@ class LocalFilesystem
 
     public function fileSize(string $path): int
     {
-        return $this->adapter->fileSize($this->pathNormalizer->normalizePath($path))->fileSize();
+        $pathPrefixed = $this->prefixPath($this->normalizePath($path));
+
+        error_clear_last();
+
+        if (is_file($pathPrefixed) && ($fileSize = @filesize($pathPrefixed)) !== false) {
+            return $fileSize;
+        }
+
+        throw UnableToRetrieveMetadata::fileSize($path, error_get_last()['message'] ?? '');
     }
 
     public function mimeType(string $path): string
     {
-        return $this->adapter->mimeType($this->pathNormalizer->normalizePath($path))->mimeType();
+        $pathPrefixed = $this->prefixPath($this->normalizePath($path));
+
+        error_clear_last();
+
+        if (!is_file($pathPrefixed)) {
+            throw UnableToRetrieveMetadata::mimeType($pathPrefixed, 'No such file exists.');
+        }
+
+        $mimeType = @mime_content_type($pathPrefixed);
+
+        if ($mimeType === null) {
+            throw UnableToRetrieveMetadata::mimeType($path, error_get_last()['message'] ?? '');
+        }
+
+        return $mimeType;
     }
 
     public function setVisibility(string $path, string $visibility): void
     {
-        $this->adapter->setVisibility($this->pathNormalizer->normalizePath($path), $visibility);
+        $pathPrefixed = $this->prefixPath($this->normalizePath($path));
+        $permissions = is_dir($pathPrefixed) ? $this->directoryVisibilityToPermissions($visibility) : $this->fileVisibilityToPermissions($visibility);
+        $this->setPermissions($pathPrefixed, $permissions);
     }
 
     public function visibility(string $path): string
     {
-        return $this->adapter->visibility($this->pathNormalizer->normalizePath($path))->visibility();
+        $pathPrefixed = $this->prefixPath($this->normalizePath($path));
+
+        clearstatcache(false, $pathPrefixed);
+        error_clear_last();
+        $fileperms = @fileperms($pathPrefixed);
+
+        if ($fileperms === false) {
+            throw UnableToRetrieveMetadata::visibility($path, error_get_last()['message'] ?? '');
+        }
+
+        $permissions = $fileperms & 0777;
+        $visibility = $this->filePermissionsToVisibility($permissions);
+
+        return $visibility;
     }
 
     public function publicUrl(string $path, array $config = []): string
@@ -305,43 +449,27 @@ class LocalFilesystem
 
     public function temporaryUrl(string $path, DateTimeInterface $expiresAt, array $config = []): string
     {
-        $generator = $this->temporaryUrlGenerator ?: $this->adapter;
-
-        if ($generator instanceof TemporaryUrlGenerator) {
-            return $generator->temporaryUrl($path, $expiresAt, $this->config->extend($config));
-        }
-
         throw UnableToGenerateTemporaryUrl::noGeneratorConfigured($path);
     }
 
     public function checksum(string $path, array $config = []): string
     {
-        $config = $this->config->extend($config);
+        $pathPrefixed = $this->prefixPath($this->normalizePath($path));
 
-        if ( ! $this->adapter instanceof ChecksumProvider) {
-            return $this->calculateChecksumFromStream($path, $config);
+        $algo = $config['checksum_algo'] ?? 'md5';
+
+        error_clear_last();
+        $checksum = @hash_file($algo, $pathPrefixed);
+
+        if ($checksum === false) {
+            throw new UnableToProvideChecksum(error_get_last()['message'] ?? '', $path);
         }
 
-        try {
-            return $this->adapter->checksum($path, $config);
-        } catch (ChecksumAlgoIsNotSupported) {
-            return $this->calculateChecksumFromStream($path, $config);
-        }
-    }
+        return $checksum;
+     }
 
     private function resolvePublicUrlGenerator(): ?PublicUrlGenerator
     {
-        if ($publicUrl = $this->config->get('public_url')) {
-            return match (true) {
-                is_array($publicUrl) => new ShardedPrefixPublicUrlGenerator($publicUrl),
-                default => new PrefixPublicUrlGenerator($publicUrl),
-            };
-        }
-
-        if ($this->adapter instanceof PublicUrlGenerator) {
-            return $this->adapter;
-        }
-
         return null;
     }
 
@@ -389,6 +517,12 @@ class LocalFilesystem
         return $this->rootDirectory . ltrim($path, '\\/');
     }
 
+    private function stripPathPrefix(string $path): string
+    {
+        /* @var string */
+        return substr($path, strlen($this->rootDirectory));
+    }
+
     /**
      * @param resource|string $contents
      */
@@ -404,7 +538,7 @@ class LocalFilesystem
         }
     }
 
-    protected function ensureDirectoryExists(string $dirname, ?int $visibility = null)
+    protected function ensureDirectoryExists(string $dirname, ?int $permissions = null): void
     {
         if (is_dir($dirname)) {
             return;
@@ -412,9 +546,9 @@ class LocalFilesystem
 
         error_clear_last();
 
-        $visibility = !empty($visibility) ? $visibility : $this->directoryPermissions;
+        $permissions = $permissions ?? $this->directoryVisibilityToPermissions($this->defaultDirectoryVisibility);
 
-        if (!@mkdir($dirname, $visibility, true)) {
+        if (!@mkdir($dirname, $permissions, true)) {
             $mkdirError = error_get_last();
         }
 
@@ -425,18 +559,6 @@ class LocalFilesystem
 
             throw UnableToCreateDirectory::atLocation($dirname, $errorMessage);
         }
-    }
-
-    protected function listDirectoryRecursively(string $path, int $mode = RecursiveIteratorIterator::SELF_FIRST): Traversable
-    {
-        if (!is_dir($path)) {
-            return;
-        }
-
-        yield from new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
-            $mode
-        );
     }
 
     protected function deleteFileInfoObject(SplFileInfo $file): bool
@@ -457,6 +579,69 @@ class LocalFilesystem
         if (!@chmod($location, $visibility)) {
             $extraMessage = error_get_last()['message'] ?? '';
             throw UnableToSetVisibility::atLocation($location, $extraMessage);
+        }
+    }
+
+    /**
+     * @see \League\Flysystem\UnixVisibility\PortableVisibilityConverter::forFile()
+     */
+    private function fileVisibilityToPermissions(string $visibility): int
+    {
+        $this->validateVisibility($visibility);
+
+        return $visibility === StorageAttributes::VISIBILITY_PUBLIC
+            ? $this->filePublic
+            : $this->filePrivate;
+    }
+
+    /**
+     * @see \League\Flysystem\UnixVisibility\PortableVisibilityConverter::forDirectory()
+     */
+    public function directoryVisibilityToPermissions(string $visibility): int
+    {
+        $this->validateVisibility($visibility);
+
+        return $visibility === StorageAttributes::VISIBILITY_PUBLIC
+            ? $this->directoryPublic
+            : $this->directoryPrivate;
+    }
+
+    /**
+     * @see \League\Flysystem\UnixVisibility\PortableVisibilityConverter::inverseForFile()
+     */
+    public function filePermissionsToVisibility(int $visibility): string
+    {
+        if ($visibility === $this->filePublic) {
+            return StorageAttributes::VISIBILITY_PUBLIC;
+        } elseif ($visibility === $this->filePrivate) {
+            return StorageAttributes::VISIBILITY_PRIVATE;
+        }
+
+        return StorageAttributes::VISIBILITY_PUBLIC; // default
+    }
+
+    /**
+     * @see \League\Flysystem\UnixVisibility\PortableVisibilityConverter::inverseForDirectory()
+     */
+    public function directoryPermissionsToVisibility(int $visibility): string
+    {
+        if ($visibility === $this->directoryPublic) {
+            return StorageAttributes::VISIBILITY_PUBLIC;
+        } elseif ($visibility === $this->directoryPrivate) {
+            return StorageAttributes::VISIBILITY_PRIVATE;
+        }
+
+        return StorageAttributes::VISIBILITY_PUBLIC; // default
+    }
+
+    private function validateVisibility(string $visibility): void
+    {
+        if ($visibility !== StorageAttributes::VISIBILITY_PUBLIC && $visibility !== StorageAttributes::VISIBILITY_PRIVATE) {
+            $className = StorageAttributes::class;
+            throw InvalidVisibilityProvided::withVisibility(
+                $visibility,
+                "either {$className}::PUBLIC or {$className}::PRIVATE"
+            );
         }
     }
 }
