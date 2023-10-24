@@ -125,9 +125,9 @@ abstract class AbstractEncoder
      *   first digit: compression level (default: 7)
      *   second digit: compression filter (default: 5)
      *   So default $quality is 75
-     * @param int $quality
+     * @param ?int $quality
      */
-    protected function setQuality($quality)
+    protected function setQuality(?int $quality = null)
     {
         if (in_array($this->format, [Format::JPEG, Format::WEBP, Format::TIFF, Format::AVIF, Format::HEIC])) {
             $quality = $quality === null ? 90 : (int) $quality;

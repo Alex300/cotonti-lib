@@ -139,7 +139,7 @@ abstract class AbstractImage
     }
 
     /**
-     * @param string $path
+     * @param string|\GdImage|resource|\Imagick|\SplFileInfo $path
      * @return self
      */
     public function load($path)
@@ -159,9 +159,9 @@ abstract class AbstractImage
 
     /**
      * Saves encoded image in filesystem
-     * @param ?string $fileName
-     * @param ?int $quality
-     * @param ?string $format
+     * @param ?string $fileName If NULL changes will be saved to the previously loaded file
+     * @param ?int $quality Quality. It is used only if the format of the saving file supports this parameter.
+     * @param ?string $format If NULL format will be determined by file extension
      * @return self
      */
     public function save(?string $fileName = null, ?int $quality = null, ?string $format = null): self
@@ -195,13 +195,13 @@ abstract class AbstractImage
 
     /**
      * Encodes given image
-     * @param string $format
-     * @param int $quality
+     * @param string $format Image format. For example: 'jpeg', 'png', 'heif'. Or 'data-url' to encode the image in the data Url;
+     * @param ?int $quality Quality. It is used only if the format of the saving file supports this parameter.
      * @param ?string $fileName File name to save encoded image. If is null - encoded image will be returned as string
      * @return string|bool If $fileName is passed it will return bool (success file saved or not),
      *    otherwise it returns encoded image as string
      */
-    public function encode($format, $quality, $fileName = null)
+    public function encode(string $format, ?int $quality = null, ?string $fileName = null)
     {
         return $this->getEncoder()->encode($this, $fileName, $format, $quality);
     }
@@ -230,7 +230,7 @@ abstract class AbstractImage
      *
      * @todo validate arguments
      */
-    public function crop($width, $height, $x = null, $y = null)
+    public function crop(int $width, int $height, ?int $x = null, ?int $y = null): self
     {
         $originalWidth = $this->getWidth();
         $originalHeight = $this->getHeight();
@@ -239,10 +239,10 @@ abstract class AbstractImage
         $height = (int) $height;
         $x = ($x !== null)
             ? (int) $x
-            : max(0, round(($originalWidth - $width) / 2));
+            : max(0, (int) round(($originalWidth - $width) / 2));
         $y = ($y !== null)
             ? (int) $y
-            : max(0, round(($originalHeight - $height) / 2));
+            : max(0, (int) round(($originalHeight - $height) / 2));
 
 
 //        if (!$start->in($this->getSize())) {
@@ -380,10 +380,11 @@ abstract class AbstractImage
      * For proportional resizing set width or height to NULL
      * @param int|string $width Absolute (int) or percent (string: '10%') value. IF NULL it will be calculated proportionally
      * @param int|string $height Absolute (int) or percent (string: '80%') value. IF NULL it will be calculated proportionally
-     * @param string $filter
+     * @param string $filter Resampling filter.
+     *    GD does not support filters and ignores this value.
      * @return self
      */
-    public function resize($width = null, $height = null, $filter = Image::FILTER_UNDEFINED): self
+    public function resize($width = null, $height = null, string $filter = Image::FILTER_UNDEFINED): self
     {
         $originalWidth = $this->getWidth();
         $originalHeight = $this->getHeight();
@@ -416,7 +417,7 @@ abstract class AbstractImage
      * Rotates an image at the given angle.
      * Optional $background can be used to specify the fill color of the empty
      * area of rotated image.
-     * @param int $angle
+     * @param float $angle
      * @param $background
      * @return self
      */
@@ -429,8 +430,8 @@ abstract class AbstractImage
     public abstract function strip();
 
     /**
-     * @param int|string $width Absolute (int) or percent (string: '10%') value. IF NULL it will be calculated proportionally
-     * @param int|string $height Absolute (int) or percent (string: '80%') value. IF NULL it will be calculated proportionally
+     * @param int|string $width Absolute (int) or percent (string: '10%') value. If NULL it will be calculated proportionally
+     * @param int|string $height Absolute (int) or percent (string: '80%') value. If NULL it will be calculated proportionally
      * @param string $resize Resize mode
      * @param bool $upscale
      * @param string $filter
@@ -468,12 +469,12 @@ abstract class AbstractImage
 
         if ($resize === Image::THUMBNAIL_WIDTH || $height === 0) {
             $resize = Image::THUMBNAIL_WIDTH;
-            $height = max(1, round($ratios[0] * $imageHeight));
+            $height = max(1, (int) round($ratios[0] * $imageHeight));
         }
 
         if ($resize === Image::THUMBNAIL_HEIGHT || $width === 0) {
             $resize = Image::THUMBNAIL_HEIGHT;
-            $width = max(1, round($ratios[1] * $imageWidth));
+            $width = max(1, (int) round($ratios[1] * $imageWidth));
         }
 
         if ($imageWidth === $width && $imageHeight === $height) {
@@ -492,8 +493,8 @@ abstract class AbstractImage
                 $ratio = max($ratios);
                 if ($imageWidth >= $width && $imageHeight >= $height) {
                     // Downscale the image
-                    $imageWidth = max(1, round($ratio * $imageWidth));
-                    $imageHeight = max(1, round($ratio * $imageHeight));
+                    $imageWidth = max(1, (int) round($ratio * $imageWidth));
+                    $imageHeight = max(1, (int) round($ratio * $imageHeight));
                     $thumbnail->resize($imageWidth, $imageHeight, $filter);
                     $thumbnailWidth = $width;
                     $thumbnailHeight = $height;
@@ -501,8 +502,8 @@ abstract class AbstractImage
                 } else {
                     if ($upscale) {
                         // Upscale the image so that the max dimension will be the wanted one
-                        $imageWidth = max(1, round($ratio * $imageWidth));
-                        $imageHeight = max(1, round($ratio * $imageHeight));
+                        $imageWidth = max(1, (int) round($ratio * $imageWidth));
+                        $imageHeight = max(1, (int) round($ratio * $imageHeight));
                         $thumbnail->resize($imageWidth, $imageHeight, $filter);
                     }
                     $thumbnailWidth = min($imageWidth, $width);
@@ -512,8 +513,8 @@ abstract class AbstractImage
                 $thumbnail->crop(
                     $thumbnailWidth,
                     $thumbnailHeight,
-                    max(0, round(($imageWidth - $width) / 2)),
-                    max(0, round(($imageHeight - $height) / 2))
+                    max(0, (int) round(($imageWidth - $width) / 2)),
+                    max(0, (int) round(($imageHeight - $height) / 2))
                 );
                 return $thumbnail;
                 break;
@@ -521,8 +522,8 @@ abstract class AbstractImage
             case Image::THUMBNAIL_INSET:
                 // Scale the image so that it fits the wanted size
                 $ratio = min($ratios);
-                $thumbnailWidth = max(1, round($ratio * $imageWidth));
-                $thumbnailHeight = max(1, round($ratio * $imageHeight));
+                $thumbnailWidth = max(1, (int) round($ratio * $imageWidth));
+                $thumbnailHeight = max(1, (int) round($ratio * $imageHeight));
                 $thumbnail->resize($thumbnailWidth, $thumbnailHeight, $filter);
                 return $thumbnail;
                 break;

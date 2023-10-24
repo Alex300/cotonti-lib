@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace image;
 
+use Cot;
 use image\exceptions\ImageException;
 use image\exceptions\NotSupportedException;
 
@@ -108,8 +109,8 @@ class Image
     const THUMBNAIL_INSET = 'inset';
 
     /**
-     * The thumbnail is scaled so that its smallest side equals the length of the corresponding side in the original image
-     * other side (the width or the height) is cropped.
+     * Scales the image proportionally so that its width and height are not less than the specified dimensions.
+     * If the second side is larger than the specified value, it is cropped.
      */
     const THUMBNAIL_OUTBOUND = 'outbound';
 
@@ -183,11 +184,11 @@ class Image
     ];
 
     /**
-     * @param string $path
+     * @param string|\GdImage|resource|\Imagick|\SplFileInfo $path
      * @param array|null $options
      * @return AbstractImage
      */
-    public static function load($path, $options = null)
+    public static function load($path, ?array $options = null): AbstractImage
     {
         return self::initDriver($options)->load($path);
     }
@@ -196,7 +197,7 @@ class Image
      * @param array $options
      * @return void
      */
-    public static function setConfig($options)
+    public static function setConfig($options): void
     {
         if (!empty($options)) {
             if (is_string($options)) {
@@ -209,15 +210,15 @@ class Image
             }
         }
 
-        if (empty(self::$config['driver']) && !empty(\Cot::$cfg['imageLibrary'])) {
-            self::$config['driver'] = \Cot::$cfg['imageLibrary'];
+        if (empty(self::$config['driver']) && !empty(Cot::$cfg['imageLibrary'])) {
+            self::$config['driver'] = Cot::$cfg['imageLibrary'];
         }
     }
 
     public static function config($option = null)
     {
         if ($option !== null) {
-            return isset(self::$config[$option]) ? self::$config[$option] : null;
+            return self::$config[$option] ?? null;
         }
         return self::$config;
     }
@@ -225,7 +226,7 @@ class Image
     /**
      * @return string[]
      */
-    public static function supportedFormats()
+    public static function supportedFormats(): array
     {
         try {
             return self::initDriver()->getSupportedFormats();
@@ -234,7 +235,7 @@ class Image
         }
     }
 
-    public static function currentDriver()
+    public static function currentDriver(): ?string
     {
         try {
             $driver = static::initDriver();
@@ -258,7 +259,7 @@ class Image
      * @param array|null $options
      * @return AbstractImage
      */
-    protected static function initDriver($options = null)
+    protected static function initDriver(?array $options = null): AbstractImage
     {
         self::setConfig($options);
 

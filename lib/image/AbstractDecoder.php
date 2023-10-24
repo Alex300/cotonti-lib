@@ -59,7 +59,7 @@ abstract class AbstractDecoder
     /**
      * Initiates new image from mixed data
      *
-     * @param mixed $data
+     * @param string|\GdImage|resource|\Imagick|\SplFileInfo $data
      * @return array{
      *     data: resource|\Imagick|\GdImage,
      *     mime?: string,
