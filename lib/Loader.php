@@ -135,8 +135,8 @@ class Loader
         $incDirs = array();
         if(empty($dirs)) $incDirs = self::explodeIncludePath();
         if(empty($dirs)) $dirs = array();
-        $dirs[] = cot::$cfg['modules_dir'];
-        $dirs[] = cot::$cfg['plugins_dir'];
+        $dirs[] = Cot::$cfg['modules_dir'];
+        $dirs[] = Cot::$cfg['plugins_dir'];
         $dirs[] = dirname(__FILE__); //'lib' directory;
         $dirs = array_merge($dirs, $incDirs);
         if(empty($dirs)) return false;
@@ -145,10 +145,10 @@ class Loader
          * Try finding for the file
          */
         foreach($dirs as $dir) {
-            if($dir[(mb_strlen($dir) - 1)] != DIRECTORY_SEPARATOR && $dir[(mb_strlen($dir) - 1)] != '/'){
+            if ($dir !== '' && $dir[(mb_strlen($dir) - 1)] !== DIRECTORY_SEPARATOR && $dir[(mb_strlen($dir) - 1)] !== '/') {
                 $dir .= DIRECTORY_SEPARATOR;
             }
-            $file = $dir.$filename;
+            $file = $dir . $filename;
             if(file_exists($file)){
                 if ($once) {
                     include_once $file;
