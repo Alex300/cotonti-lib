@@ -29,7 +29,6 @@ class Image extends AbstractImage
      */
     public function isAvailable()
     {
-        //return false;
         return extension_loaded('gd') && function_exists('gd_info');
     }
 
