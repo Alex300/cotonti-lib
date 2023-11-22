@@ -14,24 +14,32 @@ use image\exceptions\RuntimeException;
  */
 class Image extends AbstractImage
 {
-    protected static $filterMap = [
-        \image\Image::FILTER_UNDEFINED => \Imagick::FILTER_UNDEFINED,
-        \image\Image::FILTER_POINT => \Imagick::FILTER_POINT,
-        \image\Image::FILTER_BOX => \Imagick::FILTER_BOX,
-        \image\Image::FILTER_TRIANGLE => \Imagick::FILTER_TRIANGLE,
-        \image\Image::FILTER_HERMITE => \Imagick::FILTER_HERMITE,
-        \image\Image::FILTER_HANNING => \Imagick::FILTER_HANNING,
-        \image\Image::FILTER_HAMMING => \Imagick::FILTER_HAMMING,
-        \image\Image::FILTER_BLACKMAN => \Imagick::FILTER_BLACKMAN,
-        \image\Image::FILTER_GAUSSIAN => \Imagick::FILTER_GAUSSIAN,
-        \image\Image::FILTER_QUADRATIC => \Imagick::FILTER_QUADRATIC,
-        \image\Image::FILTER_CUBIC => \Imagick::FILTER_CUBIC,
-        \image\Image::FILTER_CATROM => \Imagick::FILTER_CATROM,
-        \image\Image::FILTER_MITCHELL => \Imagick::FILTER_MITCHELL,
-        \image\Image::FILTER_LANCZOS => \Imagick::FILTER_LANCZOS,
-        \image\Image::FILTER_BESSEL => \Imagick::FILTER_BESSEL,
-        \image\Image::FILTER_SINC => \Imagick::FILTER_SINC,
-    ];
+    protected static $filterMap = [];
+
+    public function __construct()
+    {
+        if ($this->isAvailable() && empty(static::$filterMap)) {
+            static::$filterMap = [
+                \image\Image::FILTER_UNDEFINED => \Imagick::FILTER_UNDEFINED,
+                \image\Image::FILTER_POINT => \Imagick::FILTER_POINT,
+                \image\Image::FILTER_BOX => \Imagick::FILTER_BOX,
+                \image\Image::FILTER_TRIANGLE => \Imagick::FILTER_TRIANGLE,
+                \image\Image::FILTER_HERMITE => \Imagick::FILTER_HERMITE,
+                \image\Image::FILTER_HANNING => \Imagick::FILTER_HANNING,
+                \image\Image::FILTER_HAMMING => \Imagick::FILTER_HAMMING,
+                \image\Image::FILTER_BLACKMAN => \Imagick::FILTER_BLACKMAN,
+                \image\Image::FILTER_GAUSSIAN => \Imagick::FILTER_GAUSSIAN,
+                \image\Image::FILTER_QUADRATIC => \Imagick::FILTER_QUADRATIC,
+                \image\Image::FILTER_CUBIC => \Imagick::FILTER_CUBIC,
+                \image\Image::FILTER_CATROM => \Imagick::FILTER_CATROM,
+                \image\Image::FILTER_MITCHELL => \Imagick::FILTER_MITCHELL,
+                \image\Image::FILTER_LANCZOS => \Imagick::FILTER_LANCZOS,
+                \image\Image::FILTER_BESSEL => \Imagick::FILTER_BESSEL,
+                \image\Image::FILTER_SINC => \Imagick::FILTER_SINC,
+            ];
+        }
+        //parent::__construct();
+    }
 
     /**
      * Image object
@@ -50,8 +58,7 @@ class Image extends AbstractImage
      */
     public function isAvailable()
     {
-        //return false;
-        return extension_loaded('imagick') && class_exists('Imagick') && !empty(\Imagick::queryFormats());
+        return extension_loaded('imagick') && class_exists('\Imagick') && !empty(\Imagick::queryFormats());
     }
 
     public function destroy()
