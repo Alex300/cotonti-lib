@@ -18,7 +18,9 @@ defined('COT_CODE') or die('Wrong URL.');
 //require_once cot_incfile(cot::$env['ext'], 'plug');
 
 // Default controller
-if (!$m) $m = 'Main';
+if (!$m) {
+    $m = 'Main';
+}
 
 $controllerName = cot::$env['ext'].'_controller_'.ucfirst($m);
 
@@ -27,9 +29,11 @@ if (class_exists($controllerName)) {
     /* Create the controller */
     $controller = new $controllerName();
 
-    if(!$a) $a = cot_import('a', 'P', 'TXT');
+    if (!$a) {
+        $a = cot_import('a', 'P', 'TXT');
+    }
     $action = $a;
-    if(!empty($action) && mb_strpos($action, '-') !== false) {
+    if (!empty($action) && mb_strpos($action, '-') !== false) {
         $action = explode('-', $action);
         $tmp = array_shift($action);
         $action = array_map('mb_ucfirst', $action);
@@ -51,11 +55,11 @@ if (class_exists($controllerName)) {
     }
 
     if (isset($outContent)){
-        $plugin_body .= $outContent;
+        $pluginBody .= $outContent;
         unset($outContent);
     }
 
-}else{
+} else {
     // Error page
     cot_die_message(404);
     exit;
