@@ -97,7 +97,8 @@ class Encoder extends AbstractEncoder
                 break;
 
             case Format::WEBP:
-                $compression = \Imagick::COMPRESSION_JPEG;
+                // For WEBP, this is usually not required as the format determines the compression itself.
+                // $compression = \Imagick::COMPRESSION_JPEG;
                 break;
 
             case Format::TIFF:
