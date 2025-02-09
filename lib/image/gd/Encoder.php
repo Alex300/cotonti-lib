@@ -111,7 +111,11 @@ class Encoder extends AbstractEncoder
                 $resource = $this->image->getData();
                 imagealphablending($resource, false);
                 imagesavealpha($resource, true);
-                $result =  imagewebp($this->image->getData(), $fileName);
+                $quality = -1;
+                if ($this->quality !== null && $this->quality >= 0 && $this->quality <= 100) {
+                    $quality = $this->quality;
+                }
+                $result =  imagewebp($this->image->getData(), $fileName, $quality);
                 break;
 
             case Format::XBM:
