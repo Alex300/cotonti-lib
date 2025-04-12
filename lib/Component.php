@@ -525,9 +525,9 @@ class Component extends BaseObject
      * This method represents the happening of an event. It invokes
      * all attached handlers for the event including class-level handlers.
      * @param string $name the event name
-     * @param Event $event the event parameter. If not set, a default [[Event]] object will be created.
+     * @param ?Event $event the event parameter. If not set, a default [[Event]] object will be created.
      */
-    public function trigger($name, Event $event = null)
+    public function trigger($name, ?Event $event = null)
     {
         $this->ensureBehaviors();
         if (!empty($this->_events[$name])) {
